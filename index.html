@@ -1,0 +1,1960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visual Novel Starter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Nunito:wght@400;600;700&family=DM+Sans:wght@500;700&family=Fraunces:opsz,wght@9..144,900&display=swap" rel="stylesheet">
+<style>
+/* =========================================================
+   LOOK & FEEL — change colors and fonts here
+   ========================================================= */
+:root{
+  --accent:#f0c674;
+  --box-bg:rgba(10,24,58,.9);
+  --box-border:rgba(240,198,116,.55);
+  --text:#f6f2ff;
+  --name-bg:#f0c674;
+  --title-font:'Cormorant Garamond', serif;
+  --body-font:'Nunito', system-ui, sans-serif;
+  --ui-font:'DM Sans', system-ui, sans-serif;
+  --gold-light:#f0c674;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#000;color:var(--text);font-family:var(--body-font);overflow:hidden}
+#game{position:relative;width:100vw;height:100vh;max-width:calc(100vh*16/9);max-height:calc(100vw*9/16);margin:auto;top:50%;transform:translateY(-50%);overflow:hidden;background:#111;user-select:none}
+
+/* layers */
+#bg,#bg2{position:absolute;inset:0;background-size:cover;background-position:center;transition:opacity 1s ease}
+#bg2{opacity:0}
+#chars{position:absolute;inset:0;pointer-events:none}
+.char{position:absolute;bottom:0;height:88%;transition:left .6s ease,opacity .5s ease,transform .5s ease,filter .3s;opacity:0;transform:translateX(-50%) translateY(20px)}
+.char.on{opacity:1;transform:translateX(-50%) translateY(0)}
+.char.dim{filter:brightness(.55)}
+.char img,.char svg{height:100%;width:auto;display:block}
+
+/* dialogue box */
+#box{position:absolute;left:3%;right:3%;bottom:3%;min-height:26%;background:var(--box-bg);border:1px solid var(--box-border);border-radius:14px;padding:2.2em 2em 1.4em;backdrop-filter:blur(6px);cursor:pointer;font-size:clamp(14px,2.1vw,20px);line-height:1.6;transition:opacity .3s}
+#box.hidden{opacity:0;pointer-events:none}
+#name{position:absolute;top:-.9em;left:1.4em;background:var(--name-bg);color:#1b1035;font-weight:700;padding:.25em 1em;border-radius:8px;font-size:.95em;letter-spacing:.02em}
+#name:empty{display:none}
+#text.narration{font-style:italic;opacity:.9}
+#next{position:absolute;right:1.2em;bottom:.8em;width:0;height:0;border-left:.45em solid transparent;border-right:.45em solid transparent;border-top:.6em solid var(--accent);animation:bob 1s infinite;opacity:0}
+#next.show{opacity:1}
+@keyframes bob{50%{transform:translateY(4px)}}
+
+/* choices */
+#choices{position:absolute;inset:0 0 32% 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.8em;pointer-events:none}
+#choices button{pointer-events:auto;min-width:50%;padding:.8em 1.6em;font:600 clamp(14px,2vw,19px) var(--body-font);color:var(--text);background:var(--box-bg);border:1px solid var(--box-border);border-radius:10px;cursor:pointer;transition:background .2s,transform .2s}
+#choices button:hover{background:var(--accent);color:#1b1035;transform:scale(1.03)}
+
+/* video */
+#video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000;display:none;z-index:20}
+#skipVideo{position:absolute;right:1em;bottom:1em;z-index:21;display:none}
+
+/* top menu */
+#menu{position:absolute;top:.8em;right:.8em;display:flex;gap:.4em;z-index:15}
+.btn{font:600 13px var(--body-font);color:var(--text);background:rgba(0,0,0,.45);border:1px solid var(--box-border);padding:.45em .8em;border-radius:7px;cursor:pointer}
+.btn:hover,.btn.active{background:var(--accent);color:#1b1035}
+
+/* =========================================================
+   TITLE PAGE + MENU PAGES (dark gold & royal blue)
+   ========================================================= */
+.screen{position:absolute;inset:0;z-index:30;display:none;overflow:hidden;background:#120a04}
+.screen.on{display:block}
+.screen-bg{position:absolute;inset:0;background-size:cover;background-position:center;filter:brightness(.6)}
+.screen-bg.placeholder{filter:none;background:
+  radial-gradient(ellipse 45% 55% at 50% 38%,rgba(214,150,40,.55),transparent 70%),
+  radial-gradient(ellipse 80% 70% at 50% 40%,#5a3208 0%,#2a1504 55%,#0e0703 100%)}
+.screen-vignette{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 35%,rgba(0,0,0,.75) 100%);pointer-events:none}
+
+#title .logo-wrap{position:absolute;left:50%;top:41%;transform:translate(-50%,-50%);width:100%;display:flex;justify-content:center;animation:logoIn 1.2s ease-out both}
+#title .logo-wrap img{width:100%;height:auto;}
+#logoPlaceholder{font:700 clamp(32px,6vw,72px) var(--title-font);text-align:center;line-height:1;color:#e9edff;text-shadow:0 0 30px rgba(255,200,90,.5),0 4px 0 #1e3a8a}
+@keyframes logoIn{from{opacity:0;transform:translate(-50%,-46%) scale(.96)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+
+#title .menu-row{position:absolute;left:0;right:0;bottom:15%;display:flex;justify-content:center;gap:clamp(10px,2.2vw,32px);animation:fadeUp 1s .5s ease-out both}
+.menu-btn{min-width:clamp(120px,13vw,190px);padding:.7em 1.2em;font:700 clamp(11px,1vw,14px) var(--ui-font);letter-spacing:.14em;text-transform:uppercase;border-radius:6px;cursor:pointer;transition:transform .2s,box-shadow .2s,filter .2s;border:2px solid var(--gold-light)}
+.menu-btn.gold{background:linear-gradient(180deg,#e0a54a 0%,#c4832a 55%,#a86a1c 100%);color:#2a1604}
+.menu-btn.blue{background:linear-gradient(180deg,#1f4a9a 0%,#16377a 55%,#0f2860 100%);color:#fff4dc}
+.menu-btn:hover,.menu-btn:focus-visible{transform:translateY(-3px);box-shadow:0 0 22px rgba(240,190,90,.55);filter:brightness(1.1);outline:none}
+#title .tagline{position:absolute;left:0;right:0;bottom:4.5%;text-align:center;font:500 clamp(10px,1vw,14px) var(--ui-font);letter-spacing:.16em;text-transform:uppercase;color:#f3dcae;animation:fadeUp 1s .8s ease-out both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+
+/* CASE SELECT PAGE */
+#casePage{background:#000}
+.case-head{position:absolute;top:4%;left:20%;right:20%;display:flex;justify-content:space-between;align-items:flex-start}
+.eyebrow{font:700 clamp(9px,.7vw,11px) var(--ui-font);letter-spacing:.2em;text-transform:uppercase;color:var(--gold-light)}
+.case-head h2{font:900 clamp(22px,2.4vw,34px) 'Fraunces',var(--title-font);color:#fff;margin-top:.25em;text-shadow:0 2px 0 rgba(240,198,116,.35)}
+.case-head .menu-btn{min-width:0;padding:.75em 1.2em;margin-top:.3em;box-shadow:0 3px 0 rgba(240,198,116,.35)}
+.case-prompt{position:absolute;top:18%;left:0;right:0;text-align:center;font:500 clamp(13px,1.3vw,19px) var(--ui-font);color:#f5f0e6}
+.case-row{position:absolute;top:24%;bottom:5%;left:0;right:0;display:flex;justify-content:center;gap:clamp(16px,2vw,32px)}
+.case-card{height:100%;aspect-ratio:800/1240;display:flex;flex-direction:column;border:2px solid var(--gold-light);border-radius:12px;overflow:hidden;cursor:pointer;background:#0d2a5c;transition:transform .25s,box-shadow .25s;padding:0}
+.case-card img{flex:1;min-height:0;width:100%;object-fit:cover;object-position:top;display:block}
+.case-card span{display:block;padding:.9em 0;text-align:center;font:700 clamp(11px,1vw,15px) var(--ui-font);letter-spacing:.16em;text-transform:uppercase;color:#fff;background:linear-gradient(180deg,#123a7a,#0c2a5e);border-top:1px solid rgba(240,198,116,.4)}
+.case-card:hover,.case-card:focus-visible{transform:translateY(-6px);box-shadow:0 0 30px rgba(240,198,116,.45);outline:none}
+
+/* TEAM INFO PAGE */
+#teamPage .screen-bg{filter:brightness(.75)}
+.group:nth-child(2){grid-row:span 1}
+.team-wrap{position:absolute;inset:3% 20% 2%;display:flex;flex-direction:column}
+.team-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2.2%}
+.team-head h2{font:900 clamp(20px,2.3vw,34px) 'Fraunces',var(--title-font);color:#fff8ea;margin-top:.15em;text-shadow:0 2px 8px rgba(0,0,0,.4)}
+.team-head .menu-btn{min-width:0;padding:.7em 1.1em;box-shadow:0 3px 0 rgba(240,198,116,.4)}
+.team-grid{display:grid;grid-template-columns:1fr 1fr;align-items:start;column-gap:clamp(10px,1.3vw,20px);row-gap:clamp(4px,.6vw,10px);isolation:isolate}
+.group{position:relative;margin-top:clamp(20px,2.2vw,32px);background:linear-gradient(180deg,#ecd3a0 0%,#dcb978 100%);border:2px solid #b98e45;border-radius:0 12px 12px 12px;padding:clamp(10px,1vw,16px);padding-top:clamp(12px,1.2vw,18px);display:flex;flex-direction:column;box-shadow:0 8px 24px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.5)}
+.group::before{content:"";position:absolute;left:38%;right:5%;top:clamp(-12px,-.8vw,-8px);height:clamp(16px,1.6vw,24px);background:linear-gradient(180deg,#fffaf0,#f1e8d6);border:1px solid #d8c9a8;border-bottom:0;border-radius:3px 3px 0 0;transform:rotate(-1.2deg);z-index:-1}
+.group::after{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:rgba(255,255,255,.35);border-radius:0 10px 0 0}
+.group h3{position:absolute;bottom:100%;left:-2px;margin:0;padding:.55em 2.2em .35em 1em;font:700 clamp(9px,.8vw,12px) var(--ui-font);letter-spacing:.14em;text-transform:uppercase;color:#4a2e0c;background:#ecd3a0;border:2px solid #b98e45;border-bottom:0;border-radius:8px 8px 0 0;clip-path:polygon(0 0,82% 0,100% 100%,0 100%);z-index:1}
+.group h3::after{content:"";position:absolute;left:0;right:0;bottom:-3px;height:5px;background:#ecd3a0}
+.glass{display:grid;grid-template-columns:1fr 1fr;align-content:start;gap:clamp(6px,.7vw,10px)}
+.pcard{text-align:left;border-radius:6px;padding:clamp(6px,.7vw,11px);cursor:pointer;border:1px solid rgba(255,255,255,.25);transition:transform .2s,box-shadow .2s;font-family:var(--ui-font);min-height:0}
+.pcard:hover,.pcard:focus-visible{transform:translateY(-3px);box-shadow:0 0 18px rgba(240,198,116,.6);outline:none}
+.pcard.gold{background:linear-gradient(160deg,#f0a640,#c98226);color:#fff}
+.pcard.blue{background:linear-gradient(160deg,#1f4f9a,#0f2c63);color:#fff}
+.pcard.white{background:#fff;color:#111}
+.pcard .qicon{width:clamp(20px,1.9vw,30px);aspect-ratio:1;border:2px solid #d9b45f;border-radius:4px;background:#0f2a1e;color:#fff;display:grid;place-items:center;font:900 clamp(12px,1.1vw,17px) var(--ui-font);overflow:hidden;margin-bottom:.4em}
+.pcard .qicon img{width:100%;height:100%;object-fit:cover;object-position:50% 4%}
+.pcard .qicon.has-photo{background:#fffaf0;width:clamp(30px,2.8vw,44px)}
+.pcard b{display:block;font-size:clamp(10px,.82vw,13px);margin-bottom:.35em}
+.pcard .prog{display:block;font-size:clamp(8px,.62vw,10px);font-weight:700;letter-spacing:.06em;margin-bottom:.5em;opacity:.95}
+.pcard .yr{display:block;font-size:clamp(8px,.62vw,10px)}
+.team-hint{margin-top:1%;font:700 clamp(8px,.7vw,11px) var(--ui-font);color:var(--gold-light)}
+
+/* profile popup */
+#profile{position:absolute;inset:0;z-index:45;display:none;place-items:center;background:rgba(0,0,0,.55)}
+#profile.on{display:grid;animation:pfade .25s}
+@keyframes pfade{from{opacity:0}}
+.pbox{position:relative;width:min(56%,880px);background:linear-gradient(180deg,#24528f,#0f2a5c);border:3px solid var(--gold-light);border-radius:12px;padding:clamp(14px,2vw,30px);display:grid;grid-template-columns:34% 1fr;gap:clamp(12px,2vw,30px);font-family:var(--ui-font);color:#f3eee2;animation:ppop .3s ease-out}
+@keyframes ppop{from{transform:scale(.95);opacity:0}}
+.pbox .plabel{grid-column:1/-1;font:700 clamp(10px,.9vw,14px) var(--ui-font);letter-spacing:.2em;color:var(--gold-light);margin-bottom:-.6em}
+.pclose{position:absolute;top:clamp(10px,1.4vw,22px);right:clamp(10px,1.4vw,22px);width:clamp(26px,2.2vw,36px);aspect-ratio:1;border-radius:50%;border:2px solid #f3d9a6;background:#d98e2b;color:#fff;font:700 clamp(14px,1.2vw,18px) var(--ui-font);cursor:pointer}
+.pphoto{position:relative;aspect-ratio:3/4;background:#fff;border:clamp(4px,.45vw,7px) solid #b8862f;border-radius:6px;overflow:hidden;display:grid;place-items:center;align-self:start}
+.pphoto img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 0}
+.pphoto img.contain{object-fit:contain;object-position:center;padding:8%}
+.pphoto .ph{font:900 clamp(40px,5vw,80px) var(--ui-font);color:#0f2a1e;opacity:.25}
+.ptopic{font:700 clamp(8px,.7vw,11px) var(--ui-font);letter-spacing:.18em;text-transform:uppercase;color:var(--gold-light)}
+.pname{font:900 clamp(18px,2vw,32px) 'Fraunces',var(--title-font);color:#fff8ea;margin:.15em 0 .5em}
+.ptable{width:100%;border-collapse:collapse;background:rgba(10,25,60,.55);border:1px solid rgba(240,198,116,.35);border-radius:6px;overflow:hidden;font-size:clamp(11px,.95vw,15px)}
+.ptable td{padding:.6em .8em;border-bottom:1px solid rgba(255,255,255,.12)}
+.ptable tr:last-child td{border-bottom:0}
+.ptable td:first-child{width:26%;font-weight:700;color:var(--gold-light);text-transform:uppercase;letter-spacing:.04em}
+.pdialog{margin-top:1em;min-height:5.2em;background:#071530;border:2px solid #fff;border-radius:8px;padding:.9em 1em;font-size:clamp(11px,.95vw,15px);line-height:1.65}
+.pdialog .caret{display:inline-block;width:.5em;height:1em;background:var(--gold-light);vertical-align:-.15em;margin-left:2px;animation:blink .8s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.pnav{display:flex;justify-content:space-between;align-items:center;margin-top:1em}
+.pnav .menu-btn{min-width:0;padding:.65em 1.2em;box-shadow:0 3px 0 rgba(0,0,0,.35)}
+.pnav span{font-weight:700;font-size:clamp(11px,1vw,15px)}
+
+/* play-case confirm */
+#confirm{position:absolute;inset:0;z-index:45;display:none;place-items:center;background:rgba(0,0,0,.65)}
+#confirm.on{display:grid;animation:pfade .25s}
+.cbox{width:min(40%,560px);background:linear-gradient(180deg,#24528f,#0f2a5c);border:3px solid var(--gold-light);border-radius:12px;padding:clamp(18px,2.4vw,36px);text-align:center;font-family:var(--ui-font);color:#f3eee2;animation:ppop .3s ease-out;box-shadow:0 0 40px rgba(240,198,116,.25)}
+.cbox .eyebrow{margin-bottom:.6em}
+.cbox h3{font:900 clamp(18px,1.9vw,30px) 'Fraunces',var(--title-font);color:#fff8ea;line-height:1.25}
+.cbox p{margin-top:.7em;font-size:clamp(11px,.95vw,15px);font-style:italic;opacity:.85;line-height:1.5}
+.cbtns{display:flex;justify-content:center;gap:clamp(10px,1.4vw,20px);margin-top:clamp(16px,1.8vw,28px)}
+.cbtns .menu-btn{min-width:clamp(90px,8vw,130px)}
+
+/* menu music toggle */
+.sound-btn{position:absolute;right:1.2%;bottom:2%;z-index:44;width:clamp(30px,2.6vw,42px);aspect-ratio:1;border-radius:50%;border:2px solid var(--gold-light);background:rgba(15,40,96,.85);color:var(--gold-light);font:700 clamp(13px,1.2vw,18px) var(--ui-font);cursor:pointer;display:none}
+.sound-btn.show{display:block}
+.sound-btn.off{opacity:.6;text-decoration:line-through}
+
+/* click-to-start splash */
+#splash{background:#000;cursor:pointer;transition:opacity .8s ease}
+#splash .screen-bg{filter:brightness(.25)}
+#splash.leaving{opacity:0;pointer-events:none}
+.splash-inner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.1em;text-align:center}
+.splash-cta{font:700 clamp(14px,1.6vw,24px) var(--ui-font);letter-spacing:.35em;text-transform:uppercase;color:var(--gold-light);text-shadow:0 0 18px rgba(240,198,116,.55);animation:pulse 2s ease-in-out infinite;padding-left:.35em}
+.splash-sub{font:500 clamp(10px,.85vw,13px) var(--ui-font);letter-spacing:.18em;text-transform:uppercase;color:#cdbf9f;opacity:.75}
+.splash-line{width:clamp(80px,10vw,160px);height:1px;background:linear-gradient(90deg,transparent,var(--gold-light),transparent)}
+@keyframes pulse{0%,100%{opacity:.45}50%{opacity:1}}
+
+/* LIBRARY PAGE */
+#libraryPage .screen-bg{filter:brightness(.55)}
+.lib-wrap{position:absolute;inset:3% 14% 3%;display:flex;flex-direction:column}
+.lib-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1%}
+.lib-head h2{font:900 clamp(20px,2.3vw,34px) 'Fraunces',var(--title-font);color:#fff8ea;margin-top:.15em;text-shadow:0 2px 8px rgba(0,0,0,.5)}
+.lib-head .menu-btn{min-width:0;padding:.7em 1.1em;box-shadow:0 3px 0 rgba(240,198,116,.4)}
+.shelves{flex:1;display:flex;flex-direction:column;justify-content:space-evenly;gap:clamp(8px,1.2vw,18px);min-height:0}
+.shelf{position:relative}
+.shelf-items{position:relative;display:flex;justify-content:center;align-items:flex-end;gap:clamp(30px,6vw,110px);padding:0 4%;min-height:clamp(64px,7vw,112px)}
+.books{position:absolute;bottom:0;display:flex;align-items:flex-end;gap:2px}
+.books.l{left:3%}.books.r{right:3%}
+.books i{display:block;border-radius:2px 2px 0 0;box-shadow:inset -3px 0 0 rgba(0,0,0,.25),inset 2px 0 0 rgba(255,255,255,.15)}
+.books i::after{content:"";display:block;margin:30% 18% 0;height:2px;background:rgba(240,198,116,.7)}
+.books i.tilt{transform:rotate(-12deg);transform-origin:bottom left;margin-left:6px}
+.doc{background:none;border:0;cursor:pointer;text-decoration:none;display:flex;flex-direction:column;align-items:center;transition:transform .2s;padding:0}
+.doc svg{height:clamp(52px,5.6vw,92px);width:auto;image-rendering:pixelated;filter:drop-shadow(0 6px 4px rgba(0,0,0,.55));transition:filter .2s}
+.doc:hover,.doc:focus-visible{transform:translateY(-8px);outline:none}
+.doc:hover svg,.doc:focus-visible svg{filter:drop-shadow(0 0 14px rgba(240,198,116,.8)) drop-shadow(0 10px 6px rgba(0,0,0,.5))}
+.plank{position:relative;height:clamp(16px,1.5vw,22px);border-radius:3px;background:linear-gradient(180deg,#a8703c 0%,#8a5528 35%,#6b3e1a 100%);box-shadow:0 10px 18px rgba(0,0,0,.55),inset 0 2px 0 rgba(255,220,170,.35);margin-top:-2px}
+.plank::after{content:"";position:absolute;left:0;right:0;top:100%;height:clamp(8px,.8vw,12px);background:linear-gradient(180deg,#4a2a10,#2e1906);border-radius:0 0 3px 3px}
+.plaque{position:absolute;left:50%;top:50%;transform:translate(-50%,-30%);z-index:1;padding:.35em 1.2em;font:700 clamp(8px,.7vw,11px) var(--ui-font);letter-spacing:.2em;text-transform:uppercase;color:#3a2408;background:linear-gradient(180deg,#f6dc95,#cfa24a);border:1px solid #8a6420;border-radius:3px;box-shadow:0 2px 4px rgba(0,0,0,.45);white-space:nowrap}
+.doc-labels{display:flex;justify-content:center;gap:clamp(30px,6vw,110px);padding:0 4%;margin-top:clamp(14px,1.4vw,22px)}
+.doc-labels span{width:clamp(110px,11vw,190px);text-align:center;font:700 clamp(11px,1vw,16px) var(--ui-font);color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.8)}
+.shelf-items .doc{width:clamp(110px,11vw,190px)}
+.lib-hint{margin-top:.6em;font:700 clamp(8px,.7vw,11px) var(--ui-font);color:var(--gold-light)}
+
+
+/* CASE FILE ITEM (reddit post) */
+#itemBtn{position:absolute;top:.8em;left:.8em;z-index:15;display:none;align-items:center;gap:.55em;padding:.45em .9em .45em .5em;background:linear-gradient(180deg,#1f4a9a,#0f2860);border:2px solid var(--gold-light);border-radius:8px;color:#fff4dc;font:700 clamp(10px,.85vw,13px) var(--ui-font);letter-spacing:.12em;text-transform:uppercase;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.45);transition:transform .2s,box-shadow .2s}
+#itemBtn svg{height:clamp(22px,2vw,30px);width:auto}
+#itemBtn:hover,#itemBtn:focus-visible{transform:translateY(-2px);box-shadow:0 0 18px rgba(240,198,116,.6);outline:none}
+#itemBtn.show{display:flex}
+#itemBtn.new{animation:itemPing 1.2s ease-out 3;animation-fill-mode:none}
+@keyframes itemPing{0%{box-shadow:0 0 0 0 rgba(240,198,116,.8)}100%{box-shadow:0 0 0 18px rgba(240,198,116,0)}}
+#postWin{position:absolute;inset:0;z-index:35;display:none;place-items:center;background:rgba(0,0,0,.55)}
+#postWin.on{display:flex;align-items:center;justify-content:center;animation:pfade .25s}
+.pwin{position:relative;width:min(62%,900px);height:86%;max-height:86%;min-height:0;display:flex;flex-direction:column;background:linear-gradient(180deg,#24528f,#0f2a5c);border:3px solid var(--gold-light);border-radius:12px;padding:clamp(10px,1.1vw,16px);transition:width .3s ease,height .3s ease;animation:ppop .3s ease-out}
+#postWin.big .pwin{width:96%;height:94%;max-height:94%}
+.pbar{display:flex;align-items:center;gap:.6em;margin-bottom:.7em;font-family:var(--ui-font)}
+.pbar .ttl{flex:1;font:700 clamp(10px,.85vw,13px) var(--ui-font);letter-spacing:.2em;text-transform:uppercase;color:var(--gold-light)}
+.pbar button{min-width:0;padding:.5em .9em;font-size:clamp(10px,.8vw,12px)}
+.pscroll{flex:1;min-height:0;overflow:auto;border-radius:8px;background:#fff;color:#1a1a1b;padding:clamp(14px,1.8vw,30px) clamp(16px,2.2vw,40px);font-family:'Nunito',system-ui,sans-serif;font-size:clamp(12px,1vw,16px);line-height:1.6;scroll-behavior:smooth}
+#postWin.big .pscroll{font-size:clamp(14px,1.25vw,20px)}
+.rmeta{display:flex;align-items:center;gap:.6em;font-size:.8em;color:#576f76;margin-bottom:.6em}
+.rmeta .av{width:2em;height:2em;border-radius:50%;background:#ff4500;color:#fff;display:grid;place-items:center;font-weight:800;font-size:.85em}
+.rmeta b{color:#1a1a1b}
+.rtitle{font:800 1.45em/1.3 'Nunito',system-ui,sans-serif;margin-bottom:.5em}
+.rflair{display:inline-block;background:#7193ff;color:#fff;font-size:.75em;font-weight:700;padding:.15em .7em;border-radius:999px;margin-bottom:.8em}
+.rbody p{margin:0 0 .85em}
+.rbody p.hl{background:#fff3c4;box-shadow:-6px 0 0 #f0c674;transition:background .4s}
+.rfoot{display:flex;gap:1.4em;margin-top:1.2em;padding-top:.8em;border-top:1px solid #edeff1;font-size:.8em;font-weight:700;color:#576f76}
+.pnote{margin-top:.6em;text-align:center;font:600 clamp(10px,.8vw,12px) var(--ui-font);color:#e9e4d6;opacity:.85}
+
+/* COURTROOM: name role, interjections, evidence, end card */
+#name .role{display:inline-block;margin-left:.7em;padding-left:.7em;border-left:1px solid rgba(27,16,53,.35);font:700 .62em var(--ui-font);letter-spacing:.14em;text-transform:uppercase;opacity:.75;vertical-align:.12em}
+#shoutFx{position:absolute;inset:0;z-index:28;display:none;align-items:center;justify-content:center;pointer-events:none;background:radial-gradient(ellipse at center,rgba(255,240,200,.25),rgba(0,0,0,.35))}
+#shoutFx.on{display:flex}
+#shoutFx svg{width:68%;height:auto;animation:shoutPop .9s cubic-bezier(.2,1.6,.4,1) both;filter:drop-shadow(0 10px 30px rgba(0,0,0,.6))}
+@keyframes shoutPop{0%{transform:scale(.2) rotate(-8deg);opacity:0}18%{transform:scale(1.08) rotate(-3deg);opacity:1}30%{transform:scale(1) rotate(-3deg)}85%{transform:scale(1) rotate(-3deg);opacity:1}100%{transform:scale(1.04) rotate(-3deg);opacity:0}}
+#game.shake #bg,#game.shake #bg2,#game.shake #chars,#game.shake #box{animation:shake .45s ease-in-out}
+@keyframes shake{0%,100%{transform:translate(0,0)}15%{transform:translate(-14px,6px)}30%{transform:translate(12px,-8px)}45%{transform:translate(-9px,4px)}60%{transform:translate(7px,-3px)}75%{transform:translate(-4px,2px)}}
+#game.shake .char.on{animation:shakeChar .45s ease-in-out}
+@keyframes shakeChar{0%,100%{transform:translateX(-50%)}25%{transform:translateX(calc(-50% - 12px))}50%{transform:translateX(calc(-50% + 10px))}75%{transform:translateX(calc(-50% - 5px))}}
+.ev-card{display:flex;gap:1em;align-items:center;background:linear-gradient(180deg,#24528f,#0f2a5c);border:3px solid var(--gold-light);border-radius:10px;padding:.9em 1.2em;color:#f3eee2;font-family:var(--ui-font);box-shadow:0 10px 40px rgba(0,0,0,.6)}
+.ev-card svg{height:clamp(40px,4.4vw,70px);width:auto;flex:none}
+.ev-card .ev-k{font:700 clamp(8px,.7vw,11px) var(--ui-font);letter-spacing:.2em;text-transform:uppercase;color:var(--gold-light)}
+.ev-card .ev-n{font:900 clamp(15px,1.5vw,24px) 'Fraunces',var(--title-font);color:#fff8ea;margin:.1em 0 .2em}
+.ev-card .ev-d{font-size:clamp(11px,.95vw,15px);opacity:.9;line-height:1.45}
+#evAdd{position:absolute;inset:0;z-index:27;display:none;align-items:center;justify-content:center;pointer-events:none}
+#evAdd.on{display:flex}
+#evAdd .ev-card{width:min(46%,620px);animation:evIn 1.5s ease both}
+@keyframes evIn{0%{transform:translateY(30px) scale(.9);opacity:0}15%{transform:none;opacity:1}75%{transform:none;opacity:1}100%{transform:translate(-70%,-160%) scale(.35);opacity:0}}
+#presented{position:absolute;top:9%;right:2.5%;z-index:16;width:min(34%,440px);display:none}
+#presented.on{display:block;animation:presIn .45s cubic-bezier(.2,1.3,.4,1) both}
+@keyframes presIn{from{transform:translateX(120%)}to{transform:none}}
+#sceneCard{position:absolute;left:0;right:0;top:38%;z-index:26;display:none;text-align:center;pointer-events:none}
+#sceneCard.on{display:block;animation:scIn 2s ease both}
+#sceneCard .sc-k{font:700 clamp(10px,.9vw,14px) var(--ui-font);letter-spacing:.3em;text-transform:uppercase;color:var(--gold-light)}
+#sceneCard .sc-t{font:900 clamp(26px,3.6vw,56px) 'Fraunces',var(--title-font);color:#fff8ea;text-shadow:0 4px 24px rgba(0,0,0,.7)}
+#sceneCard::before,#sceneCard::after{content:"";display:block;margin:0 auto;width:min(40%,520px);height:1px;background:linear-gradient(90deg,transparent,var(--gold-light),transparent)}
+#sceneCard::before{margin-bottom:.8em}#sceneCard::after{margin-top:.8em}
+@keyframes scIn{0%{opacity:0;transform:translateY(10px)}20%,80%{opacity:1;transform:none}100%{opacity:0}}
+#endCard{position:absolute;inset:0;z-index:40;display:none;place-items:center;background:rgba(0,0,0,.72)}
+#endCard.on{display:grid;animation:pfade .4s}
+#endCard .cbox{width:min(44%,600px)}
+#endCard .cbtns{flex-wrap:wrap}
+/* court record layout */
+.pbody{flex:1;min-height:0;display:flex;gap:clamp(8px,.9vw,14px)}
+.rec-list{width:30%;flex:none;overflow:auto;display:flex;flex-direction:column;gap:6px}
+.rec-list[hidden]{display:none}
+.rec-item{display:flex;align-items:center;gap:.6em;text-align:left;padding:.5em .6em;border-radius:8px;border:2px solid transparent;background:rgba(7,21,48,.7);color:#f3eee2;font:700 clamp(10px,.85vw,13px) var(--ui-font);cursor:pointer}
+.rec-item svg{height:clamp(20px,1.9vw,30px);width:auto;flex:none}
+.rec-item:hover,.rec-item:focus-visible{border-color:rgba(240,198,116,.6);outline:none}
+.rec-item.sel{border-color:var(--gold-light);background:rgba(240,198,116,.18)}
+.ev-detail{display:flex;flex-direction:column;gap:1em}
+.ev-detail .ev-head{display:flex;gap:1em;align-items:center}
+.ev-detail .ev-head svg{height:4.2em;width:auto}
+.ev-detail h4{font:900 1.5em 'Fraunces',var(--title-font);color:#0f2a5c}
+.ev-detail .ev-desc{font-size:1.05em}
+.ev-quote{border-left:4px solid #f0c674;background:#fff8e6;padding:.7em 1em;border-radius:0 6px 6px 0;font-style:italic}
+.ev-detail .menu-btn{align-self:flex-start;min-width:0;padding:.55em 1em;font-size:.75em}
+
+/* quote ribbon, present mode, verdict reveal */
+#quoteRib{position:absolute;top:8.5%;left:2%;z-index:16;width:min(40%,560px);display:none;cursor:pointer;background:#fffdf6;color:#1a1a1b;border:2px solid var(--gold-light);border-left:8px solid #ff4500;border-radius:8px;padding:.7em 1em;font:600 clamp(11px,1vw,15px)/1.5 'Nunito',system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+#quoteRib.on{display:block;animation:qIn .45s cubic-bezier(.2,1.3,.4,1) both}
+#quoteRib .qk{display:block;font:800 .72em var(--ui-font);letter-spacing:.16em;text-transform:uppercase;color:#ff4500;margin-bottom:.3em}
+#quoteRib mark{background:#fff0b3;padding:0 .15em;border-radius:2px}
+@keyframes qIn{from{transform:translateX(-110%)}to{transform:none}}
+#postWin.presenting .pwin{border-color:#ff7a59;box-shadow:0 0 40px rgba(255,122,89,.45)}
+
+#postWin.presenting .pnote{font-size:clamp(12px,1.05vw,16px);color:#fff4dc;opacity:1;font-weight:700}
+.present-btn{align-self:flex-start;margin-top:.4em;min-width:0!important;padding:.75em 1.6em!important;font-size:.85em!important}
+#revealCard{position:absolute;inset:0;z-index:40;display:none;place-items:center;background:rgba(0,0,0,.75)}
+#revealCard.on{display:grid;animation:pfade .4s}
+#revealCard .cbox{width:min(46%,640px)}
+.rv-flair{display:inline-block;margin:.5em 0 .2em;padding:.35em 1.3em;border-radius:999px;background:#7193ff;color:#fff;font:800 clamp(16px,1.6vw,26px) 'Nunito',system-ui,sans-serif;animation:flairPop .7s .3s cubic-bezier(.2,1.6,.4,1) both}
+@keyframes flairPop{from{transform:scale(0);opacity:0}to{transform:none;opacity:1}}
+.rv-you{margin-top:1em;font-size:clamp(12px,1vw,15px)}
+.rv-you b{color:var(--gold-light)}
+#flashFx{position:absolute;inset:0;z-index:29;background:#fff;opacity:0;pointer-events:none}
+#flashFx.on{animation:flash .5s ease-out}
+@keyframes flash{0%{opacity:.95}100%{opacity:0}}
+.menu-btn.locked{filter:grayscale(.85) brightness(.75);opacity:.8}
+.menu-btn.locked:hover{transform:none;box-shadow:none}
+.doc.locked svg{filter:grayscale(1) brightness(.6) drop-shadow(0 6px 4px rgba(0,0,0,.55))}
+.doc .lock{position:absolute;font-size:clamp(18px,1.8vw,28px);transform:translateY(-40%)}
+.doc{position:relative}
+.refl-name{font:900 1.4em 'Fraunces',var(--title-font);color:#0f2a5c;margin-bottom:.6em}
+.refl-body p{margin:0 0 .9em}
+/* inner pages (Team Info, Library) */
+.page-inner{position:absolute;inset:7% 9%;background:linear-gradient(180deg,rgba(15,30,70,.88),rgba(10,18,45,.92));border:2px solid var(--gold-light);border-radius:12px;padding:2em 2.4em;overflow:auto;box-shadow:0 10px 60px rgba(0,0,0,.6)}
+.page-inner h2{font:700 clamp(26px,3.4vw,44px) var(--title-font);color:var(--gold-light);margin-bottom:.4em}
+.page-inner p{font-family:var(--ui-font);line-height:1.7;color:#e9e4d6}
+.back-btn{position:absolute;top:1.2em;right:1.4em;min-width:0;padding:.55em 1.1em;font-size:12px}
+
+/* overlays: log, save/load, toast */
+.panel{position:absolute;inset:6%;z-index:40;background:rgba(14,10,26,.96);border:1px solid var(--box-border);border-radius:14px;padding:1.5em 2em;overflow:auto;display:none}
+.panel h2{font:700 28px var(--title-font);margin-bottom:.6em}
+.panel .close{position:absolute;top:1em;right:1em}
+.log-line{padding:.5em 0;border-bottom:1px solid rgba(255,255,255,.08)}
+.log-line b{color:var(--accent)}
+.slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.8em}
+.slot{padding:1em;border:1px solid var(--box-border);border-radius:10px;cursor:pointer;background:rgba(255,255,255,.04)}
+.slot:hover{border-color:var(--accent)}
+.slot small{opacity:.6;display:block;margin-top:.3em}
+#toast{position:absolute;top:1em;left:50%;transform:translateX(-50%);background:var(--accent);color:#1b1035;font-weight:700;padding:.5em 1.2em;border-radius:8px;z-index:50;opacity:0;transition:opacity .3s;pointer-events:none}
+#fade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;z-index:25;transition:opacity .8s}
+</style>
+</head>
+<body>
+<div id="game">
+  <div id="bg"></div><div id="bg2"></div>
+  <div id="chars"></div>
+  <div id="choices"></div>
+  <div id="box" class="hidden"><div id="name"></div><div id="text"></div><div id="next"></div></div>
+  <video id="video" playsinline></video>
+  <button id="skipVideo" class="btn">Skip ▶▶</button>
+  <button id="itemBtn" aria-label="Open the Court Record">
+    <svg viewBox="0 0 14 17" shape-rendering="crispEdges" aria-hidden="true" id="itemIcon"></svg><span>Court Record</span>
+  </button>
+  <div id="postWin">
+    <div class="pwin" role="dialog" aria-modal="true" aria-labelledby="pTitleR">
+      <div class="pbar">
+        <span class="ttl" id="pwTitle">Court Record</span>
+        <button class="menu-btn blue" id="pBig">⤢ Enlarge</button>
+        <button class="menu-btn gold" id="pMin">— Minimize</button>
+      </div>
+      <div class="pbody"><div class="rec-list" id="recList" hidden></div><div class="pscroll" id="pScroll"></div></div>
+      <div class="pnote" id="pNote"></div>
+    </div>
+  </div>
+  <div id="shoutFx" aria-live="assertive"></div>
+  <div id="evAdd" aria-live="polite"></div>
+  <div id="flashFx"></div>
+  <div id="presented" aria-live="polite"></div>
+  <div id="quoteRib" role="button" tabindex="0" aria-label="From OP's post — open in the Court Record"></div>
+  <div id="revealCard"><div class="cbox" role="dialog" aria-modal="true" aria-labelledby="rvTitle"><div class="eyebrow">r/AmItheAsshole</div><h3 id="rvTitle">Reddit's verdict</h3><div id="rvFlair"></div><p class="rv-you" id="rvYou"></p><div class="cbtns"><button class="menu-btn gold" id="rvGo">Continue</button></div></div></div>
+  <div id="sceneCard" aria-live="polite"><div class="sc-k" id="scK"></div><div class="sc-t" id="scT"></div></div>
+  <div id="endCard"><div class="cbox" role="dialog" aria-modal="true" aria-labelledby="ecTitle"><div class="eyebrow" id="ecK"></div><h3 id="ecTitle"></h3><p id="ecSub"></p><div class="cbtns" id="ecBtns"></div></div></div>
+  <div id="menu" style="display:none">
+    <button class="btn" id="bAuto">Auto</button>
+    <button class="btn" id="bLog">Log</button>
+    <button class="btn" id="bSave">Save</button>
+    <button class="btn" id="bLoad">Load</button>
+    <button class="btn" id="bMute">🔊</button>
+    <button class="btn" id="bFull">⛶</button>
+    <button class="btn" id="bTitle">Title</button>
+  </div>
+  <!-- CLICK TO START -->
+  <div id="splash" class="screen on" role="button" tabindex="0" aria-label="Click to start">
+    <div class="screen-bg" style="background-image:url('assets/title-bg.jpg')"></div><div class="screen-vignette"></div>
+    <div class="splash-inner">
+      <div class="splash-line"></div>
+      <div class="splash-cta">Click to start</div>
+      <div class="splash-line"></div>
+      <div class="splash-sub">🎧 Best experienced with sound on</div>
+    </div>
+  </div>
+
+  <!-- TITLE PAGE -->
+  <div id="title" class="screen">
+    <div class="screen-bg placeholder" id="titleBg"></div>
+    <div class="screen-vignette"></div>
+    <div class="logo-wrap" id="logoWrap"><div id="logoPlaceholder">Your Logo<br>Goes Here</div></div>
+    <div class="menu-row">
+      <button class="menu-btn gold" id="bStart">Start Game</button>
+      <button class="menu-btn blue" data-page="teamPage">Team Info</button>
+      <button class="menu-btn blue" data-page="libraryPage">Library</button>
+      <button class="menu-btn blue" id="bRefl" aria-label="Reflections">Reflections</button>
+    </div>
+    <div class="tagline" id="gameSub"></div>
+  </div>
+
+
+  <!-- CASE SELECT PAGE -->
+  <div id="casePage" class="screen">
+    <div class="case-head">
+      <div><div class="eyebrow">The Discussion</div><h2>Start Game</h2></div>
+      <button class="menu-btn blue" data-page="title">Back to Main Menu</button>
+    </div>
+    <div class="case-prompt">Choose a case you want to discuss.</div>
+    <div class="case-row" id="caseRow"></div>
+    <div id="confirm">
+      <div class="cbox" role="dialog" aria-modal="true" aria-labelledby="cTitle">
+        <div class="eyebrow">The Discussion</div>
+        <h3 id="cTitle"></h3>
+        <p id="cSub"></p>
+        <div class="cbtns">
+          <button class="menu-btn gold" id="cYes">Yes</button>
+          <button class="menu-btn blue" id="cNo">No</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- TEAM INFO PAGE -->
+  <div id="teamPage" class="screen">
+    <div class="screen-bg" style="background-image:url('assets/team-bg.jpg')"></div><div class="screen-vignette"></div>
+    <div class="team-wrap">
+      <div class="team-head">
+        <div><div class="eyebrow">r/AITA • Meet the speakers</div><h2>The discussion board</h2></div>
+        <button class="menu-btn blue" data-page="title">← Main Menu</button>
+      </div>
+      <div class="team-grid" id="teamGrid"></div>
+      <div class="team-hint">Choose a card to meet a speaker · Esc to return · ← → to flip profiles</div>
+    </div>
+    <div id="profile">
+      <div class="pbox" role="dialog" aria-modal="true" aria-labelledby="pName">
+        <div class="plabel">PROFILE</div>
+        <button class="pclose" id="pClose" aria-label="Close">✕</button>
+        <div class="pphoto" id="pPhoto"></div>
+        <div>
+          <div class="ptopic" id="pTopic"></div>
+          <div class="pname" id="pName"></div>
+          <table class="ptable"><tbody>
+            <tr><td>Role</td><td id="pRole"></td></tr>
+            <tr><td>Likes</td><td id="pLikes"></td></tr>
+            <tr><td>Dislikes</td><td id="pDislikes"></td></tr>
+          </tbody></table>
+          <div class="pdialog" id="pDialog"></div>
+          <div class="pnav">
+            <button class="menu-btn blue" id="pPrev">◀ Prev</button>
+            <span id="pCount"></span>
+            <button class="menu-btn blue" id="pNext">Next ▶</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LIBRARY PAGE -->
+  <div id="libraryPage" class="screen">
+    <div class="screen-bg" style="background-image:url('assets/library-bg.jpg')"></div><div class="screen-vignette"></div>
+    <div class="lib-wrap">
+      <div class="lib-head">
+        <div><div class="eyebrow">The Archive • Team Documents</div><h2>Library</h2></div>
+        <button class="menu-btn blue" data-page="title">← Main Menu</button>
+      </div>
+      <div class="shelves" id="shelves"></div>
+      <div class="lib-hint">Choose a document to open it · Esc to return</div>
+    </div>
+  </div>
+  <div class="panel" id="logPanel"><button class="btn close" data-close>Close</button><h2>History</h2><div id="logList"></div></div>
+  <div class="panel" id="slotPanel"><button class="btn close" data-close>Close</button><h2 id="slotTitle">Save</h2><div class="slots" id="slotList"></div></div>
+  <button id="menuMute" class="sound-btn" aria-label="Mute music" title="Music on/off">♪</button>
+  <div id="fade"></div>
+  <div id="toast"></div>
+</div>
+<audio id="music" loop></audio>
+<audio id="menuMusic" src="assets/menu-music.mp3" loop preload="auto"></audio>
+<audio id="sfx"></audio>
+
+<script>
+/* =========================================================
+   1. GAME INFO
+   ========================================================= */
+const GAME = {
+  title: "Am I the Asshole?",
+  tagline: "A classroom game about ethics & perspective",
+  logo: "assets/logo.png",
+  menuMusic: "assets/menu-music.mp3",   // plays on Title, Start Game, Team Info and Library
+  background: "assets/title-bg.jpg",
+};
+
+/* =========================================================
+   CASES — shown on the "Start Game" page.
+   story = which STORY section the card starts.
+   ========================================================= */
+const CASES = [
+  { label:"Case 1", image:"assets/case1.jpg", title:"I removed my partner from our biology presentation", story:"case1" },
+  { label:"Case 2", image:"assets/case2.jpg", title:"I crocheted during my child's nap-time and my husband doesn't approve", story:"case2" },
+];
+
+/* =========================================================
+   TEAM — the "Team Info" page. (First names only; no age, year or program: data privacy.)
+   color: gold | blue | white
+   photo: "assets/team/name.png" (null = "?" placeholder)
+   ========================================================= */
+const TEAM = [
+  { group:"01 / Topic 1", topic:"Topic 1", color:"gold", members:[
+    { name:"Vince Marco", role:"Discussion Contributor",
+      likes:"Pizza", dislikes:"Dinuguan", photo:"assets/team/vince.png",
+      dialogue:"'Sup. I'm Vinz and I think Deontology RULES!!!" },
+    { name:"Maria Miguela Louise", role:"Discussion Contributor",
+      likes:"Traveling", dislikes:"Coffee", photo:"assets/team/miguela.png",
+      dialogue:"Hey, Ela here! My discussions lean more into Common Good / Kabutihang Panlahat." },
+    { name:"Keziah Faith", role:"Discussion Contributor, Editor",
+      likes:"—", dislikes:"—", photo:"assets/team/keziah.png", dialogue:"(Dialogue coming soon.)" },
+    { name:"Maricris", role:"Arts and Game Design, Formatting, Discussion Contributor",
+      likes:"Video Games", dislikes:"Misogyny", photo:"assets/team/maricris.png",
+      dialogue:"Hi! I'm Mari and my arguments lean more into Virtue Ethics and Utilitarianism. I still find Filipino psychology interesting though..." },
+  ]},
+  { group:"02 / Topic 2", topic:"Topic 2", color:"blue", members:[
+    { name:"Sacha Juliana", role:"Discussion Contributor",
+      likes:"Green, Alternative Culture, Social Activism", dislikes:"Bigotry and Fascism", photo:"assets/team/sacha.png",
+      dialogue:"How about we discuss Aristotle's theory of action, deliberation, and decision while listening to Fall Out Boy?" },
+    { name:"Ma. Karina", role:"Discussion Contributor",
+      likes:"Peace", dislikes:"Noise", photo:"assets/team/karina.png", dialogue:"I believe in people's autonomy over their own body and that we are more than the roles that we play in society." },
+    { name:"Sophia", role:"Discussion Contributor, Editor",
+      likes:"Sleeping", dislikes:"Boba Pearls", photo:"assets/team/sophia.png",
+      dialogue:"Hi! My name is Sophia. I'd love to talk about Sikolohiyang Pilipino (Pakikipagkapwa) with you sometime." },
+    { name:"Stephen", role:"Discussion Contributor",
+      likes:"Grapes", dislikes:"Eggplants", photo:"assets/team/stephen.png", thumbFit:"contain",
+      dialogue:"Hi. You can call me Stephen. My arguments are based on care ethics." },
+  ]},
+  { group:"03 / The Moderator", topic:"The Moderator", color:"white", members:[
+    { name:"Keith Andrei", role:"Moderator, Discussion Contributor, Leader",
+      likes:"Iced Tea", dislikes:"Sunny Side Up Egg", photo:"assets/team/keith.png",
+      dialogue:"Hi! My name is Andrei and I have a cat named tomojerry. I also believe in having a nuanced perspective... are you ready to discuss?" },
+  ]},
+];
+
+/* =========================================================
+   LIBRARY — shelves of team documents.
+   icon: doc | stamp | folder | post
+   link: Google Drive link to the PDF (opens in a new tab)
+   post: a case name from CASE FILES (opens the Reddit post)
+   ========================================================= */
+const LIBRARY = [
+  { shelf:"Case Files", docs:[
+    { title:"Case 1: The Biology Presentation", icon:"post", post:"case1" },
+    { title:"Case 2: Crochet During Nap Time", icon:"post", post:"case2" },
+  ]},
+  { shelf:"Final Output", docs:[
+    { title:"Final Output.pdf", icon:"doc", link:"https://drive.google.com/drive/folders/1qV7DwCXFredq0Elfn84n3_wawV8twD4U?usp=sharing" },
+    { title:"Team Reflections", icon:"book", reflections:true },
+  ]},
+  { shelf:"Requirements", docs:[
+    { title:"Proof of Member Contribution", icon:"folder", link:"https://drive.google.com/drive/folders/1T1o1hz4PiGuwJQlayMBUG73GtPf4iRup?usp=sharing" },
+  ]},
+];
+
+/* =========================================================
+   CASE FILES — the Reddit post for each case.
+   Shown with { post:"case1" } in the story; after that the
+   player keeps it as an item they can reopen anytime.
+   showFlair:false hides the verdict so it isn't spoiled.
+   ========================================================= */
+const POSTS = {
+  case1: {
+    sub: "r/AmItheAsshole",
+    author: "u/throwaway (hidden)",
+    title: `AITA for removing my partner’s name from our biology presentation submission because he didn’t do anything, even though he claims I “never told him what to do”?`,
+    flair: "Not the A-hole", showFlair: false,
+    body: [
+      `I had the worst time during my school presentation today. I (17F) am senior in high school. For my biology class, we had a presentation project on genetic which was the grade of our monthly test. Usually, we could pick our partners but this time the teacher decided to switch things up. She labelled students with numbers and the identical numbered students are partners for the project, and I got Kheven.`,
+      `He’s not a bad guy, but he’s a slacker and unreliable person. He spends most of the class scrolling through tiktok on his laptop or doing random things that annoys people.`,
+      `I do not like to boss people around. I just can’t stand begging people to do their job. We are seniors in high school and should be responsible. If they want to know how they can help, they should ask instead of waiting to be told what to do.`,
+      `On the first night, I created a canva slides presentation for our project. I did my research on the topics, making sure I understood it. Kheven had access to the slides as well since I sent him the link. I had done it all night and no edits were made by Kheven. I didn’t think much of it because we had more time left to finish it and I had let it him off by not saying anything.`,
+      `In every biology class, the teacher let us join tables with our partner and work on the project. He genuinely did not even bat an eye on what I was doing and didn’t even ask what he needed to do to help. As I mentioned above that I don’t like telling other people what to do, I also didn’t say anything and just finished the presentation by myself.`,
+      `Today was presentation day, our pair was the first one up. I stood on one side and he stood on another, the whole time he was standing and staring at the class awkwardly while I did all the explaining.`,
+      `After the presentation, the teacher asked both of us questions about what we had just presented. I, of course knew what to say as I deep dived into the topic and understood the topic clearly. Kheven on the other hand, struggled to even get a single right answer out of his mouth. The teacher asked us “Did you both work on this?”`,
+      `I looked at the teacher and answered coldly, “No, I did the whole project by myself.” I then asked the teacher if I could remove kheven’s name from the project submission as he didn’t contribute to the making of the slides at all.`,
+      `Kheven absolutely lost it when we were out of our class for break time. He told me I was a selfish person and only cared about myself. He shouted “How was I supposed to help if you never told me to what to do? You just did the whole project and never gave me any tasks!”`,
+      `I told him he had the slides link, had time and he is not a child who needs to be told what to do. I continued with “if you wanted to help from the start, you should have asked?”`,
+      `Now he is telling everyone that I sabotaged his grades, and some classmates are saying that I should have communicated instead of waiting for him to ask, especially knowing the type of person he is.`,
+      `Soo, AITA?`,
+    ],
+  },
+  case2: {
+    sub: "r/AmItheAsshole",
+    author: "u/throwaway (hidden)",
+    title: `AITA for crocheting during my 1.5 year old’s nap time or down time and making it my me-time? Husband doesn’t approve!`,
+    flair: "", showFlair: false,
+    body: [
+      `I’m SAHM for the most part and work once a week. When baby is down for a nap, I take that time to get things done or keep aside half hour to crochet somedays.`,
+      `At 6 months postpartum, I was diagnosed with Postpartum anxiety and depression and crochet helped me regulate. It’s one tool that keeps me grounded and I feel like I enter that flow state, therapist said to continue it for my wellbeing. It’s been an active form of self-care and it’s helped me get out of that hard phase ever since. I try to make it part of my routine when possible.`,
+      `I make it a point to have some down time or me-time, coz throughout the day or night I’m needed.`,
+      `My husband has a secret (not a secret anymore) problem with me crocheting or having a yarn hobby like crocheting or learning knitting.`,
+      `When he gets back from work and if he sees me just crocheting or down for like 10 mins, he gets upset later and asks me like why is the laundry still running, why haven’t you finished cleaning up that or this. “Stop sitting with your crochet full time”! He starts to criticize me and point out tiny things. Mind you, my whole morning is cleaning or cooking and taking care of what needs to be done. I’m like I was on my feet all day, I will get to it in a bit. He assumes I sit with my crochet hook and yarn all day just because he walks in to me doing that. Just coz he saw me resting my legs a bit when he gets back from work. I’d rather make something productive than scroll on my phone and have my baby see me on my phone the whole time!`,
+      `When my husband is at home one day of the week coz I work, I don’t pinpoint the stuff that’s not in order in our house, coz I know how hard it is. I know he tried his best.`,
+      `Problem is, my husband doesn’t have a hobby and I keep telling him to get one, go work out, or play something, but he drinks or smokes occasionally if that’s a hobby, and keeps raining on my parade. I never felt like making him anything coz he doesn’t respect my craft enough. Says he’d rather buy stuff. I have even started to buy things for my hobby with my own money, without asking him, coz he doesn’t get it.`,
+      `I only make things for people who appreciate it. He wants to take away something that’s bringing me joy.`,
+      `Now AITA for having a hobby or me-time just so I can be a nice wife and mama and get the day and night running???? Or what am I doing wrong here? I need answers please! My brain is cooked`,
+    ],
+  },
+};
+
+/* =========================================================
+   REFLECTIONS — unlock after finishing Case 1 and Case 2.
+   Each member's paragraphs, in their own words. [] = coming soon.
+   ========================================================= */
+const REFLECTIONS = [
+  { who:"andrei", name:"Andrei", paras:["My personal ethics serves as the precursor to how I act. This allows me to be conscious and decisive with my actions understanding that it has its consequences to others that I'm also responsible for. Honestly, aside from it guiding my day-to-day behavior, my ethics is also the reflection of how I want to see the world, it doesn't just guide the short term decisions that I have but also the long term decisions of the changes that I want to see in the world.", "With ethics being the reflection of the changes that I want to see, it is important as it guides us humans to direct our actions to what's inherently good. It allows us to make the judgement as to what qualifies right or wrong considering the difference in perspective."] },
+  { who:"vinz", name:"Vinz", paras:["My personal ethics influence how I treat others and make decisions. I believe that doing what is right should not depend solely on what benefits me, but also on the responsibilities I have toward others. For example, when working on group projects, I believe in doing my fair share and respecting other people's efforts. This reflects my belief in personal responsibility and connects with Pakikipagkapwa, which reminds me that our actions affect the people around us.", "Ethics is important because our decisions affect not only ourselves but also the people around us. I believe that we have a moral responsibility to be honest, fair, and accountable, even when doing so is not necessarily convenient. For example, admitting my mistakes instead of blaming others helps build trust and accountability. This reflects my Deontological perspective of fulfilling one's moral duties, while Pakikipagkapwa and Katarungan remind me to consider the well-being and dignity of others."] },
+  { who:"mari", name:"Mari", paras:["This activity challenged my assumption that the discussion would yield an easy consensus affirming my own position. Instead, it required a more careful examination of the circumstances of every party involved. In Topic 1, we deliberated on a student who wished to drop a groupmate for failing to contribute. My initial answer was decisive: the groupmate was not the student’s responsibility, so dropping him was justified. My groupmates, however, offered other readings of the situation. Andrei and Ela argued that the student should first have made a sincere effort to reach out as an act of good faith and pakikipagkapwa. Their view compelled me to trace my reasoning back to its source.", "As the eldest daughter in a Filipino family, I have been culturally assigned the role of the responsible one, whether I choose it or not. The expectation that I extend myself without limits for others has left me resentful of how pakikipagkapwa is often practiced: as a one-sided obligation rather than a mutual regard between equals. My reaction also reflects a gendered frustration with the unspoken demand that women be empathic even at personal cost, and that they lead without claiming the recognition that leadership deserves.", "I now recognize that my initial position was less a neutral judgment than a response shaped by my own experience. Examining it does not necessarily invalidate my view, but it allows me to distinguish what I believe on principle from what I believe out of fatigue, and to consider that pakikipagkapwa, rightly understood, need not demand self-erasure."] },
+  { who:"miguela", name:"Ela", paras:["Looking at the responses to the “OP’s” post, most comments assumed the fault lay on Kheven. Up until recently, I would’ve probably thought and done the same as the “OP” and the audience. I mean, who would want to work with someone notorious for slacking off? Especially when their collaboration holds genuine weight on the grading and production of the activity. Though my past self would have held Kheven to the same standards as the “OP” did, my current ethics have developed since that period.", "In senior high school, I was constantly grouped with students who were known as “freeloaders”. During those projects, instead of exerting the effort to constantly try to push my groupmates, I would do all the work myself. With the amount of group projects assigned in senior high school, I was in a constant state of burnout. It was during a student-teacher conference where my teacher suggested that I implement the “dog treats” method. A method that relies on me feeding them ideas and passing it off as theirs to give them motivation and confidence. It was a suggestion that only fed my disdain for group projects at the time. Though I did not respond well to that suggestion at the moment, looking at the bigger picture, I realized that I, too, had contributed to enabling and enforcing that behavior on my peers. I still do not believe that the “dog treats” method is appropriate, though I now see the impact of being individualistic. In doing all the work myself to protect my grade, I compromised the common good of the group, depriving my peers of active collaboration.", "Now, I choose to approach social situations with a certain degree of nuance, making sure I truly understand the social and personal circumstances of a person before passing judgement. Like Kheven and the “OP,” my experience was a product of choices made by both my groupmates and me that lacked good intentions. Ultimately, I now hold the belief that ethics is not just about being free from fault or wrongdoing; it is also about making better choices."] },
+  { who:"keziah", name:"Keziah", paras:["This activity made me see how much my values and convictions actually matter. I’m a working student, the eldest in my family, and I serve in ministry, so I’m used to juggling a lot while still thinking about others. That’s why I sided with Kheven at first in Case 1. I knew what it felt like to struggle to keep up. But the more we talked about it, the more I realized that understanding someone isn’t the same as excusing them. I can be responsible to someone without being responsible for everything they do.", "Funny enough, my experiences pulled me the other way in Case 2. I work face-to-face from 8 to 5, so I know how it feels to come home tired and still see things left undone. That’s why I took the husband’s side and pushed the group to look at him too. These cases showed me that my convictions shape how I judge people and how I treat them. For me, that’s why ethics matters. It keeps me fair, even when my own life makes it easy to lean toward one side."] },
+  { who:"sophia", name:"Sophia", paras:["My personal ethics guide how I treat the people around me, ensuring my daily choices come from a place of genuine respect, empathy, and care. When I live out values like pakikipagkapwa and malasakit, I help build spaces where the people in my life feel safe, seen, and valued for who they are—not just judged by what they accomplish. Seeing how my choices ripple into someone else's life shows why ethics really matter: it stops us from reducing a partner or loved one to a mere tool for household utility or short-term operational productivity. A clear moral compass reminds us that a person’s holistic well-being—their physical, psychological and emotional health—will always matter more than finished chores or constant output. Ethics is what keeps our relationships human, anchoring us in a shared identity (hindi ibang-tao) and reminding us of our moral obligation to preserve, protect, and defend each other's health and dignity."] },
+  { who:"stephen", name:"Stephen", paras:["I believe my personal ethics affect the world around me through the way I think, act, and interact with other people. Even small actions can influence how others experience their interactions with me. I may not always have a big impact on the world, but I believe simple things like treating others with respect, being understanding, and helping someone in need can make a difference. I also believe that doing what is right should not always depend on what I can get in return. For example, if I see someone who needs help and I am able to offer it, I would rather help because I believe it is the right thing to do, even if that person is a stranger. Personal ethics also help me recognize actions that could hurt others, reminding me to consider the effects of my decisions before acting.", "Ethics is important because it helps guide our behavior and gives us a sense of what is right and wrong. It encourages values such as respect, honesty, fairness, and responsibility, which are important in building positive relationships. It also helps create a safer environment because people become more aware of how their actions can affect others instead of thinking only about themselves."] },
+  { who:"sacha", name:"Sacha", paras:["After this group activity, I’ve realized that there truly is a vast range of perspectives and beliefs that people have. There is no singular viewpoint in cases, and ethics is not a monolith as individuality and culture play a very huge role in this. My groupmates have had very interesting insights and I was astounded by how articulate they were as we discussed these different cases. I had the privilege to work with like-minded individuals who discussed and navigated the cases that we have chosen for our groupwork, and I think that I have started to see some things differently as well ethically."] },
+  { who:"karina", name:"Karina", paras:[] },
+];
+const SYNTHESIS = ["1. How does your personal ethics affect the world around you?", "Our personal experiences, values, and responsibilities shape how we judge what’s right, and those judgments affect how we treat the people around us. During the discussion, we noticed that our first opinions weren’t based on ethical principles alone. They also came from our own lives as students, workers, leaders, and family members.", "Most of us see our ethics in the small stuff we do every day. This shows in how we talk to people, whether we help when we can, and if we actually do our part in a group project. Stephen said that even if we can’t change the whole world, these little things still make a difference to the people we deal with. Andrei took it further and said his ethics is also about the kind of world he wants to live in.", "What surprised us was how much our own lives got in the way of judging the cases fairly. Mari and Keziah are both eldest daughters, and Keziah works 8 to 5 while studying, so they came into the discussion already leaning toward a side. If we had gone with our first reactions, some of us might have been too harsh on Kheven, while others might have been too easy on him. Ela admitted that in senior high she always ended up doing everything for her group. Back then she thought she was just saving her grade. Now she sees that her groupmates never really got the chance to help. Because of this, we realized that our “personal” choices aren’t really just personal. In one way or another, they affect other people.", "2. Recognizing the social impact of your personal ethics, why is ethics important?", "From our reflections, ethics is important because what we do never affects just us. When we’re dishonest, someone else can end up paying for it even if they did nothing wrong. Vinz mentioned owning up to mistakes instead of pointing fingers, and honestly that’s something we all need to work on.", "Ethics also keeps us from treating people like they’re only useful for what they can do. Sophia brought this up with the case about the couple, and it stuck with us. We talked about pakikipagkapwa a lot too. We still think it’s important, but some of us felt it’s been used as an excuse to make people keep giving until there’s nothing left for themselves. As Mari shared, caring for others shouldn’t mean losing ourselves.", "In the end, we didn’t agree on everything, and that’s okay. Like Sacha said, people see ethics differently, and we saw that in our group. Still, hearing each other out helped us see more than just our own side. That’s the biggest thing we learned: we need to keep checking ourselves and try to be fair, even when our own experiences pull us to one side."];
+
+/* =========================================================
+   2. BACKGROUNDS
+   Use an image file:  "assets/park.jpg"
+   ...or any CSS background (gradients work as placeholders)
+   ========================================================= */
+const BACKGROUNDS = {
+  street:  "linear-gradient(180deg,#1b1035 0%,#3a2a6b 45%,#ff7a59 100%)",
+  busstop: "linear-gradient(180deg,#0b132b 0%,#1c2541 50%,#3a506b 100%)",
+  rooftop: "linear-gradient(180deg,#ff9e7a 0%,#ffcf91 40%,#8ecae6 100%)",
+  dark:    "#05030a",
+  court:   "assets/team-bg.jpg",
+};
+
+/* =========================================================
+   3. CHARACTERS
+   name   = shown in the name box
+   color  = name box color
+   sprites = one per expression. Use an image file
+             ("assets/mika_happy.png") or leave the built-in
+             placeholder by using ph(color, expression).
+   ========================================================= */
+const CHARACTERS = {
+  andrei:  { name:"Andrei",  role:"Presiding Moderator",        color:"#ffffff", sprites:{ normal:"assets/team/keith.png" } },
+  vinz:    { name:"Vinz",    role:"Counsel · Deontology",        color:"#f0c674", sprites:{ normal:"assets/team/vince.png" } },
+  mari:    { name:"Mari",    role:"Counsel · Utilitarianism",    color:"#f0c674", sprites:{ normal:"assets/team/maricris.png" } },
+  miguela: { name:"Ela", role:"Counsel · Common Good",       color:"#f0c674", sprites:{ normal:"assets/team/miguela.png" } },
+  sophia:  { name:"Sophia",  role:"Counsel · Pakikipagkapwa & Equal Consideration", color:"#7ab0ff", sprites:{ normal:"assets/team/sophia.png" } },
+  stephen: { name:"Stephen", role:"Counsel · Care Ethics",       color:"#7ab0ff", sprites:{ normal:"assets/team/stephen.png" }, size:{ h:"40%", bottom:"31%" } },
+  sacha:   { name:"Sacha",   role:"Counsel",                     color:"#7ab0ff", sprites:{ normal:"assets/team/sacha.png" } },
+  karina:  { name:"Karina",  role:"Counsel · Autonomy",          color:"#7ab0ff", sprites:{ normal:"assets/team/karina.png" } },
+  keziah:  { name:"Keziah",  role:"Counsel · Freedom & Obligation", color:"#f0c674", sprites:{ normal:"assets/team/keziah.png" } },
+};
+
+/* MUSIC CUES — add your tracks, e.g. opening:"assets/music/opening.mp3" (null = silence) */
+const CUES = { default:"assets/music/discussion.mp3", surprise:"assets/music/verdict.mp3", opening:null, testimony:null, cross:null, verdict:"assets/music/verdict.mp3" };   // default = used for any cue left empty
+
+/* SOUND EFFECTS */
+const SFX = { door:"assets/sfx/door.mp3", gavel:"assets/sfx/gavel.mp3", shout:"assets/sfx/shout.mp3", evidence:"assets/sfx/evidence.mp3" };
+
+/* EVIDENCE — the Court Record for each case. paras = which paragraphs of OP's post it refers to. */
+const EVIDENCE = {
+  case1: [
+    { id:"post",      name:"OP's Post",              icon:"post",   desc:"OP's own account of what happened." },
+    { id:"grading",   name:"Grading Notice",         icon:"stamp",  desc:"The group presentation counted as the monthly graded test.", paras:[0] },
+    { id:"tables",    name:"Table Joining Sessions", icon:"calendar", desc:"Class sessions where the two partners could have talked.", paras:[4] },
+    { id:"slides",    name:"The Canva Slides",       icon:"slides", desc:"The only material OP sent to Kheven.", paras:[3] },
+    { id:"statement", name:"Kheven's Statement",     icon:"bubble", desc:"He was waiting to be told what to do.", paras:[8] },
+    { id:"outburst",  name:"Kheven's Outburst",      icon:"angry",  desc:"His public claim that OP sabotaged his grades.", paras:[8,10] },
+  ],
+  case2: [
+    { id:"post",      name:"OP's Post",               icon:"post",     desc:"The wife's account of what happened. It's the only side of the story the court has." },
+    { id:"therapist", name:"Therapist's Approval",    icon:"doc",      desc:"Her therapist approved crocheting as part of her self-care and recovery.", paras:[1] },
+    { id:"remark",    name:"The Husband's Remark",    icon:"angry",    desc:"He says she only sits at her crochet full-time.", paras:[4] },
+    { id:"store",     name:"The Store-Bought Remark",  icon:"bubble",   desc:"From OP's post: \u201cI never felt like making him anything coz he doesn\u2019t respect my craft enough. Says he\u2019d rather buy stuff.\u201d", paras:[6] },
+    { id:"workload",  name:"The Husband's Workload",  icon:"calendar", desc:"He works full-time, has no hobby, and still comes home to chores.", paras:[4,6] },
+    { id:"ra10361",   name:"RA No. 10361, Sections 20–21", icon:"stamp", desc:"The Batas Kasambahay's rules on daily and weekly rest for domestic workers." },
+  ],
+};
+
+
+/* =========================================================
+   4. THE STORY
+   Each section is a list of steps, run top to bottom.
+   Step types you can use:
+     { bg:"street" }                     change background (fades)
+     { music:"assets/music.mp3" }        play looping music  ( music:null stops it )
+     { sfx:"assets/door.mp3" }           play a sound once
+     { video:"assets/intro.mp4" }        play a full-screen video, then continue
+     { show:"mika", mood:"happy", at:"left" }   at: left | center | right
+     { hide:"mika" }
+     { say:"mika", text:"Hello!" }       character line (mood:"sad" optional)
+     { text:"The wind was cold." }       narration
+     { choice:[ {text:"Yes", goto:"yes", set:{trust:+1}}, {text:"No", goto:"no"} ] }
+     { set:{trust:+1} }                  change a story variable
+     { if:"trust >= 1", goto:"goodEnd", else:"badEnd" }
+     { goto:"sectionName" }
+     { wait:1000 }                       pause in milliseconds
+     { end:"THE END" }                   show ending, back to title
+   ========================================================= */
+const STORY = {
+  closing: [
+    {"bg": "court"},
+    {"music": "assets/menu-music.mp3"},
+    {"role": {"andrei": "Reflection", "vinz": "Reflection", "mari": "Reflection", "miguela": "Reflection", "keziah": "Reflection", "sophia": "Reflection", "stephen": "Reflection", "sacha": "Reflection", "karina": "Reflection"}},
+    {"scene": "Closing Statements", "k": "Reflections"},
+    {"say": "andrei", "text": "Before the court closes for good, each member of the panel will share a reflection."},
+    {"say": "andrei", "text": "My personal ethics serves as the precursor to how I act. This allows me to be conscious and decisive with my actions understanding that it has its consequences to others that I'm also responsible for."},
+    {"say": "andrei", "text": "Honestly, aside from it guiding my day-to-day behavior, my ethics is also the reflection of how I want to see the world, it doesn't just guide the short term decisions that I have but also the long term decisions of the changes that I want to see in the world."},
+    {"say": "andrei", "text": "With ethics being the reflection of the changes that I want to see, it is important as it guides us humans to direct our actions to what's inherently good."},
+    {"say": "andrei", "text": "It allows us to make the judgement as to what qualifies right or wrong considering the difference in perspective."},
+    {"say": "vinz", "text": "My personal ethics influence how I treat others and make decisions. I believe that doing what is right should not depend solely on what benefits me, but also on the responsibilities I have toward others."},
+    {"say": "vinz", "text": "For example, when working on group projects, I believe in doing my fair share and respecting other people's efforts."},
+    {"say": "vinz", "text": "This reflects my belief in personal responsibility and connects with Pakikipagkapwa, which reminds me that our actions affect the people around us."},
+    {"say": "vinz", "text": "Ethics is important because our decisions affect not only ourselves but also the people around us."},
+    {"say": "vinz", "text": "I believe that we have a moral responsibility to be honest, fair, and accountable, even when doing so is not necessarily convenient."},
+    {"say": "vinz", "text": "For example, admitting my mistakes instead of blaming others helps build trust and accountability."},
+    {"say": "vinz", "text": "This reflects my Deontological perspective of fulfilling one's moral duties, while Pakikipagkapwa and Katarungan remind me to consider the well-being and dignity of others."},
+    {"say": "mari", "text": "This activity challenged my assumption that the discussion would yield an easy consensus affirming my own position. Instead, it required a more careful examination of the circumstances of every party involved."},
+    {"say": "mari", "text": "In Topic 1, we deliberated on a student who wished to drop a groupmate for failing to contribute. My initial answer was decisive: the groupmate was not the student’s responsibility, so dropping him was justified."},
+    {"say": "mari", "text": "My groupmates, however, offered other readings of the situation. Andrei and Ela argued that the student should first have made a sincere effort to reach out as an act of good faith and pakikipagkapwa."},
+    {"say": "mari", "text": "Their view compelled me to trace my reasoning back to its source."},
+    {"say": "mari", "text": "As the eldest daughter in a Filipino family, I have been culturally assigned the role of the responsible one, whether I choose it or not."},
+    {"say": "mari", "text": "The expectation that I extend myself without limits for others has left me resentful of how pakikipagkapwa is often practiced: as a one-sided obligation rather than a mutual regard between equals."},
+    {"say": "mari", "text": "My reaction also reflects a gendered frustration with the unspoken demand that women be empathic even at personal cost, and that they lead without claiming the recognition that leadership deserves."},
+    {"say": "mari", "text": "I now recognize that my initial position was less a neutral judgment than a response shaped by my own experience."},
+    {"say": "mari", "text": "Examining it does not necessarily invalidate my view, but it allows me to distinguish what I believe on principle from what I believe out of fatigue, and to consider that pakikipagkapwa, rightly understood, need not demand self-erasure."},
+    {"say": "miguela", "text": "Looking at the responses to the “OP’s” post, most comments assumed the fault lay on Kheven. Up until recently, I would’ve probably thought and done the same as the “OP” and the audience."},
+    {"say": "miguela", "text": "I mean, who would want to work with someone notorious for slacking off? Especially when their collaboration holds genuine weight on the grading and production of the activity."},
+    {"say": "miguela", "text": "Though my past self would have held Kheven to the same standards as the “OP” did, my current ethics have developed since that period."},
+    {"say": "miguela", "text": "In senior high school, I was constantly grouped with students who were known as “freeloaders”. During those projects, instead of exerting the effort to constantly try to push my groupmates, I would do all the work myself."},
+    {"say": "miguela", "text": "With the amount of group projects assigned in senior high school, I was in a constant state of burnout. It was during a student-teacher conference where my teacher suggested that I implement the “dog treats” method."},
+    {"say": "miguela", "text": "A method that relies on me feeding them ideas and passing it off as theirs to give them motivation and confidence. It was a suggestion that only fed my disdain for group projects at the time."},
+    {"say": "miguela", "text": "Though I did not respond well to that suggestion at the moment, looking at the bigger picture, I realized that I, too, had contributed to enabling and enforcing that behavior on my peers."},
+    {"say": "miguela", "text": "I still do not believe that the “dog treats” method is appropriate, though I now see the impact of being individualistic."},
+    {"say": "miguela", "text": "In doing all the work myself to protect my grade, I compromised the common good of the group, depriving my peers of active collaboration."},
+    {"say": "miguela", "text": "Now, I choose to approach social situations with a certain degree of nuance, making sure I truly understand the social and personal circumstances of a person before passing judgement."},
+    {"say": "miguela", "text": "Like Kheven and the “OP,” my experience was a product of choices made by both my groupmates and me that lacked good intentions."},
+    {"say": "miguela", "text": "Ultimately, I now hold the belief that ethics is not just about being free from fault or wrongdoing; it is also about making better choices."},
+    {"say": "keziah", "text": "This activity made me see how much my values and convictions actually matter. I’m a working student, the eldest in my family, and I serve in ministry, so I’m used to juggling a lot while still thinking about others."},
+    {"say": "keziah", "text": "That’s why I sided with Kheven at first in Case 1. I knew what it felt like to struggle to keep up. But the more we talked about it, the more I realized that understanding someone isn’t the same as excusing them."},
+    {"say": "keziah", "text": "I can be responsible to someone without being responsible for everything they do."},
+    {"say": "keziah", "text": "Funny enough, my experiences pulled me the other way in Case 2. I work face-to-face from 8 to 5, so I know how it feels to come home tired and still see things left undone."},
+    {"say": "keziah", "text": "That’s why I took the husband’s side and pushed the group to look at him too. These cases showed me that my convictions shape how I judge people and how I treat them. For me, that’s why ethics matters."},
+    {"say": "keziah", "text": "It keeps me fair, even when my own life makes it easy to lean toward one side."},
+    {"say": "sophia", "text": "My personal ethics guide how I treat the people around me, ensuring my daily choices come from a place of genuine respect, empathy, and care."},
+    {"say": "sophia", "text": "When I live out values like pakikipagkapwa and malasakit, I help build spaces where the people in my life feel safe, seen, and valued for who they are—not just judged by what they accomplish."},
+    {"say": "sophia", "text": "Seeing how my choices ripple into someone else's life shows why ethics really matter: it stops us from reducing a partner or loved one to a mere tool for household utility or short-term operational productivity."},
+    {"say": "sophia", "text": "A clear moral compass reminds us that a person’s holistic well-being—their physical, psychological and emotional health—will always matter more than finished chores or constant output."},
+    {"say": "sophia", "text": "Ethics is what keeps our relationships human, anchoring us in a shared identity (hindi ibang-tao) and reminding us of our moral obligation to preserve, protect, and defend each other's health and dignity."},
+    {"say": "stephen", "text": "I believe my personal ethics affect the world around me through the way I think, act, and interact with other people. Even small actions can influence how others experience their interactions with me."},
+    {"say": "stephen", "text": "I may not always have a big impact on the world, but I believe simple things like treating others with respect, being understanding, and helping someone in need can make a difference."},
+    {"say": "stephen", "text": "I also believe that doing what is right should not always depend on what I can get in return."},
+    {"say": "stephen", "text": "For example, if I see someone who needs help and I am able to offer it, I would rather help because I believe it is the right thing to do, even if that person is a stranger."},
+    {"say": "stephen", "text": "Personal ethics also help me recognize actions that could hurt others, reminding me to consider the effects of my decisions before acting."},
+    {"say": "stephen", "text": "Ethics is important because it helps guide our behavior and gives us a sense of what is right and wrong."},
+    {"say": "stephen", "text": "It encourages values such as respect, honesty, fairness, and responsibility, which are important in building positive relationships."},
+    {"say": "stephen", "text": "It also helps create a safer environment because people become more aware of how their actions can affect others instead of thinking only about themselves."},
+    {"say": "sacha", "text": "After this group activity, I’ve realized that there truly is a vast range of perspectives and beliefs that people have."},
+    {"say": "sacha", "text": "There is no singular viewpoint in cases, and ethics is not a monolith as individuality and culture play a very huge role in this."},
+    {"say": "sacha", "text": "My groupmates have had very interesting insights and I was astounded by how articulate they were as we discussed these different cases."},
+    {"say": "sacha", "text": "I had the privilege to work with like-minded individuals who discussed and navigated the cases that we have chosen for our groupwork, and I think that I have started to see some things differently as well ethically."},
+    {"scene": "Synthesis", "k": "Reflections"},
+    {"role": {"keziah": "Group Synthesis"}},
+    {"info": {"k": "Synthesis", "t": "How does your personal ethics affect the world around you?"}, "lines": 9},
+    {"say": "keziah", "text": "Our personal experiences, values, and responsibilities shape how we judge what’s right, and those judgments affect how we treat the people around us."},
+    {"say": "keziah", "text": "During the discussion, we noticed that our first opinions weren’t based on ethical principles alone. They also came from our own lives as students, workers, leaders, and family members."},
+    {"say": "keziah", "text": "Most of us see our ethics in the small stuff we do every day. This shows in how we talk to people, whether we help when we can, and if we actually do our part in a group project."},
+    {"say": "keziah", "text": "Stephen said that even if we can’t change the whole world, these little things still make a difference to the people we deal with. Andrei took it further and said his ethics is also about the kind of world he wants to live in."},
+    {"say": "keziah", "text": "What surprised us was how much our own lives got in the way of judging the cases fairly."},
+    {"say": "keziah", "text": "Mari and Keziah are both eldest daughters, and Keziah works 8 to 5 while studying, so they came into the discussion already leaning toward a side."},
+    {"say": "keziah", "text": "If we had gone with our first reactions, some of us might have been too harsh on Kheven, while others might have been too easy on him. Ela admitted that in senior high she always ended up doing everything for her group."},
+    {"say": "keziah", "text": "Back then she thought she was just saving her grade. Now she sees that her groupmates never really got the chance to help. Because of this, we realized that our “personal” choices aren’t really just personal."},
+    {"say": "keziah", "text": "In one way or another, they affect other people."},
+    {"info": {"k": "Synthesis", "t": "Recognizing the social impact of your personal ethics, why is ethics important?"}, "lines": 6},
+    {"say": "keziah", "text": "From our reflections, ethics is important because what we do never affects just us. When we’re dishonest, someone else can end up paying for it even if they did nothing wrong."},
+    {"say": "keziah", "text": "Vinz mentioned owning up to mistakes instead of pointing fingers, and honestly that’s something we all need to work on."},
+    {"say": "keziah", "text": "Ethics also keeps us from treating people like they’re only useful for what they can do. Sophia brought this up with the case about the couple, and it stuck with us. We talked about pakikipagkapwa a lot too."},
+    {"say": "keziah", "text": "We still think it’s important, but some of us felt it’s been used as an excuse to make people keep giving until there’s nothing left for themselves. As Mari shared, caring for others shouldn’t mean losing ourselves."},
+    {"say": "keziah", "text": "In the end, we didn’t agree on everything, and that’s okay. Like Sacha said, people see ethics differently, and we saw that in our group. Still, hearing each other out helped us see more than just our own side."},
+    {"say": "keziah", "text": "That’s the biggest thing we learned: we need to keep checking ourselves and try to be fair, even when our own experiences pull us to one side."},
+    {"wait": 600},
+    {"endcard": "Thank You for Playing", "sub": "Court is adjourned.", "next": [{"label": "Library", "page": "libraryPage"}, {"label": "Main Menu", "page": "title"}]},
+  ],
+
+  case1: [
+    {"video": "assets/case1-opening.mp4"},
+    {"bg": "dark"},
+    {"post": "case1"},
+    {"scene": "Court Is in Session", "k": "Scene 1"},
+    {"bg": "court"},
+    {"cue": "opening"},
+    {"sfx": "gavel", "times": 3},
+    {"wait": 1100},
+    {"say": "andrei", "text": "Good afternoon everyone. Welcome to the Court of Public Opinion."},
+    {"say": "andrei", "text": "It is an honor to preside over this deliberation today. Let us begin."},
+    {"scene": "The Case", "k": "Scene 2"},
+    {"text": "OP and Kheven were assigned as partners for a group presentation, which counted as the class's monthly graded test."},
+    {"evidence": ["grading"]},
+    {"text": "Kheven did not complete his share of the work. By his own account, he was waiting to be told what to do, even though the two had table joining sessions in class."},
+    {"evidence": ["statement", "tables"]},
+    {"text": "OP sent Kheven the Canva slides and then completed the rest of the project alone."},
+    {"evidence": ["slides"]},
+    {"text": "After the presentation, OP told the teacher she had done the project alone and asked to remove Kheven's name from the submission."},
+    {"text": "In response, Kheven publicly called out OP, claiming that OP had sabotaged his grades."},
+    {"evidence": ["outburst"]},
+    {"text": "The question before the court: is OP the asshole?"},
+    {"scene": "Establishing the Dilemma", "k": "Scene 3"},
+    {"cue": "testimony"},
+    {"say": "andrei", "text": "Before either side takes a position, the court must first establish the dilemma, so that all of us are examining the same question."},
+    {"info": {"k": "Dilemma Analysis", "t": "The Issue", "d": "The author removed her classmate, Kheven, from their group project due to non-contribution.", "icon": "stamp"}, "lines": 2},
+    {"say": "andrei", "text": "Let us begin with the issue. OP removed her partner, Kheven, from their group project because he did not contribute."},
+    {"say": "andrei", "text": "Kheven now accuses her of sabotaging his grade, claiming that his responsibilities were never clearly communicated to him."},
+    {"info": {"k": "Dilemma Analysis", "t": "Critical Information", "d": "Should this action be justifiable if no responsibilities were assigned?", "icon": "folder"}, "lines": 3},
+    {"say": "andrei", "text": "The critical information is already in your Court Record. The partners were assigned at random, and OP, who dislikes bossing people around, sent Kheven only the slide link."},
+    {"say": "andrei", "text": "They sat together in every biology class, yet Kheven never offered to help or asked a single question. OP finished and presented the project alone, then removed his name."},
+    {"say": "andrei", "text": "So the question before us is this: is removing his name justifiable if no responsibilities were ever assigned?"},
+    {"info": {"k": "Stakeholder", "t": "OP", "d": "Her reputation could suffer, her relationships with classmates could get strained, and she may have to spend more time and emotional energy on the issue."}, "lines": 1},
+    {"say": "andrei", "text": "Next, the stakeholders. OP risks her reputation and her relationships with classmates, and she may have to spend more time and emotional energy on this issue."},
+    {"info": {"k": "Stakeholder", "t": "Kheven", "d": "He could get a lower grade, feel embarrassed, and have his academic reputation hurt."}, "lines": 1},
+    {"say": "andrei", "text": "Kheven could receive a lower grade, feel embarrassed, and see his academic reputation suffer."},
+    {"info": {"k": "Stakeholder", "t": "Classmates", "d": "Grading could become unfair, trust could drop, and free-riding in group work could start to feel normal."}, "lines": 1},
+    {"say": "andrei", "text": "For their classmates, grading could become unfair, trust could drop, and free-riding in group work could start to feel normal."},
+    {"info": {"k": "Stakeholder", "t": "The Teacher", "d": "It becomes harder to grade fairly and to see who actually did the work."}, "lines": 1},
+    {"say": "andrei", "text": "And for the teacher, it becomes harder to grade fairly and to see who actually did the work."},
+    {"info": {"k": "Ethical Principle", "t": "Pakikipagkapwa", "d": "Others are an extension of oneself where others are treated with the same respect and responsibility as we do with ourselves."}, "lines": 4},
+    {"say": "andrei", "text": "Two ethical principles are involved. The first is Pakikipagkapwa: others are an extension of oneself, owed the same respect and responsibility we give ourselves."},
+    {"say": "andrei", "text": "Kapwa is not merely about keeping relationships smooth. Enriquez roots it in recognizing others as fellow human beings, bridged by a shared identity regardless of social standing."},
+    {"say": "andrei", "text": "That shared identity creates a shared responsibility. Each of us is called to do our part to help the other."},
+    {"say": "andrei", "text": "Through this lens, the breakdown was a mutual failure. Kheven abandoned their shared responsibility, but OP never reached out, and so treated him as an outsider rather than as kapwa."},
+    {"info": {"k": "Ethical Principle", "t": "Katarungan"}, "lines": 2},
+    {"say": "andrei", "text": "The second principle is Katarungan, or justice. Was an injustice done to Kheven, given that no clear directives were ever set?"},
+    {"say": "andrei", "text": "Or was the injustice Kheven's own passivity, since he never asked for any responsibility in work they were both tasked to do?"},
+    {"say": "andrei", "text": "The dilemma has been established. The court will now hear opening arguments."},
+    {"scene": "Opening Arguments", "k": "Scene 4"},
+    {"say": "andrei", "text": "I will step down from the bench briefly to open with a position that may not be popular."},
+    {"role": {"andrei": "Off the bench · Sikolohiyang Pilipino"}},
+    {"say": "andrei", "text": "For the record, I am Keith Andrei, and I will argue through the lens of Sikolohiyang Pilipino."},
+    {"say": "andrei", "text": "Through the lens of Sikolohiyang Pilipino, a groupmate is an extension of one's kapwa, the shared self. The question, then, is whether OP extended herself to her kapwa."},
+    {"quote": 1, "part": "He’s not a bad guy, but he’s a slacker and unreliable person."},
+    {"say": "andrei", "text": "OP was already aware that Kheven was irresponsible. Rather than treating the task as a group project, OP chose to complete it alone."},
+    {"shout": "TAKE THAT!", "by": "andrei"},
+    {"present": "slides"},
+    {"say": "andrei", "text": "OP's only attempt at collaboration was sending these slides."},
+    {"say": "andrei", "text": "Kheven's irresponsibility is circumstantial. For the benefit of everyone, the better course is to extend oneself to one's kapwa and act for the good of all."},
+    {"say": "andrei", "text": "It is true that Kheven made no effort. It can equally be argued, however, that OP made no effort to reach out and treat the project as a shared undertaking."},
+    {"say": "andrei", "text": "In doing so, OP separated her own identity, her ego, from her partner, having recognized that the two held different views of personal responsibility and accountability."},
+    {"say": "andrei", "text": "OP was thinking of herself; Kheven was enjoying his free time. These are two different perspectives, yet each one mirrors its own kind of selfishness."},
+    {"say": "andrei", "text": "Let me be clear: I do not condone Kheven's slacking. But OP did not make the necessary effort to reach out to him either."},
+    {"sfx": "gavel"},
+    {"role": {"andrei": null}},
+    {"say": "andrei", "text": "The moderator returns to the bench. Vinz, you appear to disagree. You have the floor."},
+    {"say": "vinz", "text": "May it please the court. I am Vince Marco, and I will argue through the lens of Deontology."},
+    {"say": "vinz", "text": "Thank you. I side with OP."},
+    {"say": "vinz", "text": "Deontology, the duty-based ethics championed by Immanuel Kant, judges an action by its inherent rightness and moral duty, regardless of its consequences."},
+    {"shout": "TAKE THAT!", "by": "vinz"},
+    {"present": "grading"},
+    {"say": "vinz", "text": "The presentation was the monthly graded test. Kheven was, in all likelihood, aware of this."},
+    {"say": "vinz", "text": "As a student, he has a duty to be responsible for his own grades."},
+    {"say": "vinz", "text": "If we assume the teacher had already instructed the class, then Kheven disregarded those instructions and did what he usually does: slack off."},
+    {"say": "vinz", "text": "And if Kheven knew what was required of him, then OP sending only the Canva slides presents no problem at all."},
+    {"say": "vinz", "text": "Kheven insists he could not help because OP never told him what to do."},
+    {"quote": 8, "part": "How was I supposed to help if you never told me to what to do?"},
+    {"challenge": "Kheven says he couldn't help because no one told him what to do. Present the evidence that shows he had every chance to ask.", "by": "vinz", "accept": {"tables": "case1_ch_tables", "slides": "case1_ch_slides"}, "wrong": "That doesn't answer Kheven's claim. Look at the Court Record again.", "hint": "Hint: think about when the two of them sat together in class, or what Kheven already had access to from the first night."},
+  ],
+
+  case1_ch_tables: [
+    {"say": "vinz", "text": "Why was he waiting for tasks when he could have started a conversation with OP during their table joining sessions?"},
+    {"goto": "case1_b"},
+  ],
+
+  case1_ch_slides: [
+    {"say": "vinz", "text": "He had the link to these slides from the very first night. He could have opened them, seen the work and asked where to start."},
+    {"say": "vinz", "text": "And he sat beside OP in every table joining session. Why wait for tasks when he could simply have asked?"},
+    {"goto": "case1_b"},
+  ],
+
+  case1_b: [
+    {"present": "outburst"},
+    {"say": "vinz", "text": "His outburst shows that he cares about his grades. If he had the energy to tell everyone they were sabotaged, why didn't he have that same energy at the start of the project?"},
+    {"say": "vinz", "text": "He cared enough to publicly call out OP after he was removed, but not while the project was still ongoing? The contradiction speaks for itself."},
+    {"say": "andrei", "text": "A strong argument from duty. Mari, the floor is yours."},
+    {"say": "mari", "text": "May it please the court. I am Maricris, and I will argue through the lens of Utilitarianism."},
+    {"say": "mari", "text": "I also side with OP, though from a different framework."},
+    {"say": "mari", "text": "In utilitarianism, an action is judged by its outcome. The aim is to produce the greatest good for the greatest number."},
+    {"say": "mari", "text": "When one student fails to fulfill their responsibilities, the result is poorer quality of work and missed deadlines for the group."},
+    {"say": "mari", "text": "The other members must therefore consider what produces the best outcome for them, given those circumstances."},
+    {"say": "mari", "text": "This raises a question the court should not ignore: at what point does understanding others become damaging to oneself? In this case, damaging to OP's own education?"},
+    {"say": "andrei", "text": "Noted. Ela, where does the common good stand?"},
+    {"say": "miguela", "text": "May it please the court. I am Maria Miguela Louise, and I will argue through the lens of the Common Good."},
+    {"say": "miguela", "text": "My position is that OP is not the asshole, but OP is not blameless either."},
+    {"say": "miguela", "text": "The common good approach asks us to consider collective welfare. OP did not consider the collective welfare of both herself and her partner."},
+    {"quote": 2, "part": "If they want to know how they can help, they should ask instead of waiting to be told what to do."},
+    {"say": "miguela", "text": "OP did not fully exhaust her options for communicating. She assumed common sense, and in doing so, she failed to communicate in a way that extended good will."},
+    {"say": "miguela", "text": "The purpose of group work is collaboration. Going the extra mile may therefore have been necessary."},
+    {"say": "andrei", "text": "A middle position. Keziah, you are the final counsel."},
+    {"say": "keziah", "text": "May it please the court. I am Keziah Faith, and I will argue through the lens of Freedom and Obligation."},
+    {"say": "keziah", "text": "I will admit that I initially sided with Kheven. As a full-time working student, I know how difficult it is to balance work and studies."},
+    {"say": "keziah", "text": "Virgilio Enriquez's Sikolohiyang Pilipino teaches that to understand a person's actions, we must first consider where they come from, such as their family, their work and their circumstances, before passing judgment."},
+    {"shout": "TAKE THAT!", "by": "keziah"},
+    {"present": "statement"},
+    {"say": "keziah", "text": "However, after reading OP's full account, I realized that he was not busy at all. He was simply waiting to be told what to do."},
+    {"quote": 10, "part": "Now he is telling everyone that I sabotaged his grades"},
+    {"say": "keziah", "text": "What is more disappointing is that instead of owning his shortcomings, he blamed OP and spread the claim that he had been sabotaged, which was not true."},
+    {"say": "keziah", "text": "John Mothershead holds that morality requires two things: freedom, the capacity to choose, and obligation, the responsibility for what one has chosen."},
+    {"say": "keziah", "text": "In Filipino, we say buntot mo, hila mo: you carry the consequences of your own choices. Kheven had the choice to do his part, but he did not stand by that responsibility."},
+    {"say": "keziah", "text": "Kant also teaches that we must treat others as persons with dignity, never merely as a means to our own ends. In effect, Kheven used OP's efforts as a means to obtain a grade."},
+    {"quote": 7, "part": "I then asked the teacher if I could remove kheven’s name from the project submission"},
+    {"say": "keziah", "text": "Therefore, OP is not the asshole. Her handling, however, was not perfect. It would have been better to speak with Kheven privately before approaching the teacher."},
+    {"quote": 2, "part": "I do not like to boss people around."},
+    {"say": "keziah", "text": "Pakikipagkapwa includes correcting a person's mistake without humiliating them. Still, I understand OP's hesitation; she did not want to appear bossy."},
+    {"scene": "Cross-Examination", "k": "Scene 5"},
+    {"cue": "cross"},
+    {"say": "andrei", "text": "The court will now hear rebuttals. Vinz, do you have a response to the argument from kapwa?"},
+    {"shout": "OBJECTION!", "by": "vinz"},
+    {"say": "vinz", "text": "Pakikipagkapwa goes both ways. Suppose OP did reach out to Kheven. What if he did not reciprocate?"},
+    {"shout": "HOLD IT!", "by": "keziah"},
+    {"say": "keziah", "text": "I acknowledge that reaching out matters. Sometimes it is exactly what a person needs to catch up."},
+    {"say": "keziah", "text": "However, even if OP had reached out, the responsibility to act would still have rested with Kheven. Reaching out is a form of help; it does not replace his own responsibility."},
+    {"say": "keziah", "text": "I propose a distinction: being responsible to Kheven, and being responsible for Kheven."},
+    {"say": "keziah", "text": "The first means showing concern, reaching out and not humiliating him. On that point, I agree that OP fell short."},
+    {"say": "keziah", "text": "The second means taking on his share of the work or covering for him. There I hesitate, because it risks tolerating wrongdoing, what we call pagkunsinti."},
+    {"say": "keziah", "text": "Pakikipagkapwa does not mean accommodating everything. Fairness is part of it."},
+    {"say": "keziah", "text": "Consider pakikisama, one of our mores: including the name of a groupmate who contributed nothing, simply to avoid conflict. As James Rachels argues, a practice is not right merely because it is customary."},
+    {"say": "keziah", "text": "It would be unfair for Kheven to receive a grade without having contributed. That is the consequence of his own choice."},
+    {"say": "andrei", "text": "A fair distinction. Allow me, however, to step down once more and challenge the court using Mari's own framework."},
+    {"role": {"andrei": "Off the bench · Challenging Utilitarianism"}},
+    {"shout": "OBJECTION!", "by": "andrei"},
+    {"say": "andrei", "text": "Reaching out to Kheven and assigning him tasks would also increase the number of people doing good."},
+    {"say": "andrei", "text": "OP's initiative was commendable, since it at least limited the wrongdoing to one person. But one should also try to cover every base, so that the greatest number of people, in this case two, accomplish the good."},
+    {"sfx": "gavel"},
+    {"role": {"andrei": null}},
+    {"say": "andrei", "text": "Speaking again as moderator, in fairness to Mari: under strict utilitarianism, reaching out to Kheven would not be the best course. It would drain the time needed for the project, and with less time, the quality of the output would decline, which does not maximize the effort."},
+    {"say": "andrei", "text": "And under deontology, Vinz, there is also a duty of self-reliance and active participation, a duty that applies to Kheven."},
+    {"say": "andrei", "text": "The panel is divided. Let us now examine what OP could actually have done."},
+    {"scene": "Courses of Action", "k": "Scene 6"},
+    {"say": "andrei", "text": "The court will now consider two opposing courses of action that OP could have taken."},
+    {"info": {"k": "Course of Action 1", "t": "Reaching Out and Initiating Extended Dialogue", "icon": "bubble"}, "lines": 4},
+    {"say": "andrei", "text": "The first course of action: reach out and initiate an extended dialogue with Kheven."},
+    {"say": "andrei", "text": "The partnership ended in a hostile exchange, and its social fabric was left damaged. Dialogue aims to rebuild the collaboration the pair never had."},
+    {"say": "andrei", "text": "Through pakikipagkapwa and kabutihang panlahat, both OP and Kheven carry an ethical responsibility to start that conversation."},
+    {"say": "andrei", "text": "It opens a space for social weaving, where both sides can set aside their assumptions, talk about what went wrong and move forward as a group."},
+    {"info": {"k": "Course of Action 2", "t": "Leaving Things Be and Let Kheven Learn Responsibility Through This Failure", "icon": "stamp"}, "lines": 4},
+    {"say": "andrei", "text": "The second course of action: leave things be, and let Kheven learn responsibility through this failure."},
+    {"say": "andrei", "text": "It rests on natural consequences. Schools are training grounds for professionals, and this teaches Kheven independence instead of relying on his peers to decide for him."},
+    {"say": "andrei", "text": "Tolerating his attitude would do more harm than good, since it leaves his irresponsibility without accountability or consequence."},
+    {"say": "andrei", "text": "It sends a clear message: negligence, in school and beyond, has real consequences, and he must learn to correct himself rather than wait for a peer to save him."},
+    {"say": "andrei", "text": "Two paths, each with its own cost. The decision now passes to you."},
+    {"scene": "Your Verdict", "k": "Scene 7"},
+    {"cue": "verdict"},
+    {"say": "andrei", "text": "You have heard the case, the dilemma and the arguments of counsel. The court now asks: is OP the asshole?"},
+    {"choice": [{"text": "NTA — Not the Asshole", "goto": "case1_nta", "verdict": "nta"}, {"text": "YTA — You're the Asshole", "goto": "case1_yta", "verdict": "yta"}, {"text": "Not the asshole, but not blameless", "goto": "case1_nb", "verdict": "nb"}]},
+  ],
+
+  case1_nta: [
+    {"say": "vinz", "text": "Duty is duty. Kheven had his, and he did not fulfill it."},
+    {"say": "mari", "text": "OP protected the outcome for the group, and her own education."},
+    {"goto": "case1_end"},
+  ],
+
+  case1_yta: [
+    {"say": "andrei", "text": "A groupmate is a kapwa. OP had the opportunity to extend herself, and chose not to."},
+    {"goto": "case1_end"},
+  ],
+
+  case1_nb: [
+    {"say": "miguela", "text": "OP is not the asshole, but group work is about collaboration. The extra mile was worth going."},
+    {"say": "keziah", "text": "Responsible to Kheven, yes. Responsible for Kheven, no."},
+    {"goto": "case1_end"},
+  ],
+
+  case1_end: [
+    {"reveal": "case1", "reddit": "nta"},
+    {"scene": "The Panel's Resolution", "k": "Scene 8"},
+    {"say": "andrei", "text": "Before we close, the panel will share its own resolution."},
+    {"info": {"k": "Our Decision", "t": "Critical Information", "d": "The author instead met Kheven’s passivity with the same passivity treating Kheven like an outsider which defeats the purpose of group work."}, "lines": 4},
+    {"say": "andrei", "text": "Our decision turns on one critical fact: OP took the entire project upon herself because she did not like to boss people around."},
+    {"say": "andrei", "text": "The project was given as group work precisely to build collaboration and communication."},
+    {"say": "andrei", "text": "Kheven failed both his personal and group responsibilities. But OP already knew he tended to slack, and instead of seeing him as kapwa, she met his passivity with passivity of her own."},
+    {"say": "andrei", "text": "In doing so, she treated him as an outsider, which defeats the purpose of group work."},
+    {"info": {"k": "Final Resolution", "t": "Reaching Out and Having a Dialogue", "d": "This dialogue will allow both parties to break their animosity towards each other.", "icon": "bubble"}, "lines": 3},
+    {"say": "andrei", "text": "The panel therefore resolves on the first course of action: reach out and open a dialogue."},
+    {"say": "andrei", "text": "Dialogue lets both parties break their animosity, acknowledge their shortcomings, and possibly rectify the outcome."},
+    {"say": "andrei", "text": "OP learns her responsibility to others in group work. Kheven learns accountability for his own grades, without waiting to be told what to do."},
+    {"say": "andrei", "text": "This was a remarkable deliberation from all parties. Court is adjourned."},
+    {"sfx": "gavel"},
+    {"wait": 900},
+    {"endcard": "Case 1 Complete", "complete": "case1", "sub": "Court is adjourned. Thank you for deliberating.", "next": [{"label": "Play Case 2", "case": "case2"}, {"label": "Library", "page": "libraryPage"}, {"label": "Main Menu", "page": "title"}]},
+  ],
+
+  case2: [
+    {"video": "assets/case2-opening.mp4"},
+    {"bg": "dark"},
+    {"role": {"mari": "Surprise Counsel · Equity", "keziah": "Surprise Counsel · Ethics of Care & Equal Consideration"}},
+    {"post": "case2"},
+    {"scene": "Court Is in Session", "k": "Scene 1"},
+    {"bg": "court"},
+    {"cue": "opening"},
+    {"sfx": "gavel", "times": 3},
+    {"wait": 1100},
+    {"text": "Case 2. A mother, a husband and a crochet hook."},
+    {"say": "andrei", "text": "Order. The Court of Public Opinion is now in session for its second case."},
+    {"say": "andrei", "text": "As before, we will review the case, establish the dilemma, and hear from counsel. The verdict, once again, will be yours."},
+    {"scene": "The Case", "k": "Scene 2"},
+    {"text": "OP is the mother of a one-and-a-half-year-old child, and she is recovering from postpartum anxiety and depression."},
+    {"text": "She crochets during her child's nap time and down time, and she treats it as her me-time. Her therapist has approved it as part of her self-care."},
+    {"evidence": ["therapist"]},
+    {"text": "Her husband works full-time. He does not approve, and he says that she only sits at her crochet all day."},
+    {"text": "OP adds that she has never felt like making him anything, because he does not respect her craft. He says he would rather buy things."},
+    {"evidence": ["remark", "store", "workload"]},
+    {"text": "The question before the court: is OP the asshole?"},
+    {"scene": "Establishing the Dilemma", "k": "Scene 3"},
+    {"cue": "testimony"},
+    {"say": "andrei", "text": "Before counsel take their positions, the court must first establish the dilemma."},
+    {"info": {"k": "Dilemma Analysis", "t": "The Ethical Dilemma", "d": "A disagreement between a stay-at-home mother who uses her child’s nap time or down time for personal crocheting, and a working husband who expects her time to be used in more meaningful ways such as household chores.", "icon": "stamp"}, "lines": 2},
+    {"say": "andrei", "text": "Let us begin with the issue. A stay-at-home mother uses her child's nap time or down time for personal crocheting."},
+    {"say": "andrei", "text": "Her working husband, however, expects her time to be used in more meaningful ways, such as household chores."},
+    {"info": {"k": "Dilemma Analysis", "t": "Critical Information", "d": "The fundamental question is which interest to take into consideration first—her mental health and capacity as a mother or her spouse's expectation of non-stop domestic labor?", "icon": "folder"}, "lines": 7},
+    {"say": "andrei", "text": "The critical information is in your Court Record. The wife is mostly a stay-at-home mother who also works once a week, and she spends much of her day caring for her child, cooking and cleaning."},
+    {"say": "andrei", "text": "After being diagnosed with postpartum anxiety and depression, she found that crocheting helped her manage her emotions, and her therapist encouraged her to continue it for her well-being."},
+    {"say": "andrei", "text": "She sometimes crochets for around 30 minutes while her child naps, and uses other nap times to finish household chores."},
+    {"say": "andrei", "text": "Her husband, however, becomes upset when he sees her crocheting and later points out unfinished tasks, assuming she spends too much time on her hobby."},
+    {"say": "andrei", "text": "She feels he does not recognize how much work she does throughout the day, even though she gives him understanding when he cares for their child while she is at work."},
+    {"say": "andrei", "text": "She encourages him to find hobbies of his own, yet he does not seem to appreciate hers."},
+    {"say": "andrei", "text": "So the fundamental question is this: which interest comes first, her mental health and capacity as a mother, or her spouse's expectation of non-stop domestic labor? Prioritizing one inherently compromises the other."},
+    {"info": {"k": "Major Risk", "t": "Mental Health and Emotional Regulation", "d": "For the wife, crochet isn’t just a hobby, it's a tool that helps her regulate and keep her grounded after suffering from postpartum depression."}, "lines": 2},
+    {"say": "andrei", "text": "Next, the major risks. The first concerns mental health and emotional regulation. For the wife, crochet is not just a hobby; it is a tool that helps her regulate and stay grounded after postpartum depression."},
+    {"say": "andrei", "text": "Her therapist advised her to continue it. It has become part of her self-care, extending beyond a mere hobby."},
+    {"info": {"k": "Major Risk", "t": "Marital Stability and Relationship Equity", "d": "A healthy marriage requires equal respect, mutual support, and the consistent extension of grace to both partners rather than holding one spouse to a harsher standard than the other."}, "lines": 4},
+    {"say": "andrei", "text": "The second is marital stability and relationship equity. The disagreement threatens their marriage because a disconnect in understanding is present."},
+    {"say": "andrei", "text": "It may lead to arguments that strain the relationship, causing them to withdraw emotionally and resent each other."},
+    {"say": "andrei", "text": "It also raises concerns about equity: the wife extends grace and understanding to her husband, yet does not receive the same consideration for her own mental health needs."},
+    {"say": "andrei", "text": "If this imbalance continues without compromise, it may gradually erode trust, partnership and marital satisfaction, and could eventually lead to the breakdown of the relationship."},
+    {"info": {"k": "Major Risk", "t": "Division of Labor and Unfairness", "d": "From the husband’s perspective after an exhaustive workday he expects the home to be tidy and taken care of."}, "lines": 2},
+    {"say": "andrei", "text": "The third is the division of labor and a sense of unfairness. From the husband's perspective, after an exhausting workday, he expects the home to be tidy and taken care of."},
+    {"say": "andrei", "text": "Coming home exhausted to see his wife enjoying her hobby invites comparison, and it triggers resentment and a feeling of unfairness about their domestic situation."},
+    {"info": {"k": "Major Risk", "t": "Undervaluing Creativity and Craftsmanship", "d": "Crocheting is not simply a hobby or a way to pass time, it requires creativity, patience, talent, technique, and time."}, "lines": 2},
+    {"say": "andrei", "text": "The fourth is the undervaluing of creativity and craftsmanship. Crocheting requires creativity, patience, talent, technique and time."},
+    {"say": "andrei", "text": "When the husband dismisses it because the same thing can be bought in a store, he overlooks the creative process, and that dismissal affects her mental health and erodes their marriage."},
+    {"info": {"k": "Ethical Principle", "t": "Pakikipagkapwa and Pakikiramdam", "d": "It calls for sensitivity, an indirect communication that doesn’t use words but instead heavily relies on our empathy putting ourselves in the shoes of others."}, "lines": 4},
+    {"say": "andrei", "text": "Now, the ethical principles. Pakikipagkapwa is our foundation: we treat others as an extension of ourselves."},
+    {"say": "andrei", "text": "The issue should also be seen through pakikiramdam: a sensitivity and indirect communication that relies not on words but on empathy, putting ourselves in another's shoes (Pe-Pua & Protacio-Marcelino, 2000)."},
+    {"say": "andrei", "text": "Here, the husband lacked pakikiramdam. Focused only on household duties, he did not notice his wife's invisible mental struggles, or that crochet is an integral part of her recovery."},
+    {"say": "andrei", "text": "Pakikiramdam would guide him to sense her exhaustion, read between the lines of her hardship, and prioritize her over the objectives of chores."},
+    {"info": {"k": "Ethical Principle", "t": "Malasakit and Marital Ethics", "d": "Spouses are morally obligated through malasakit to actively preserve, protect and defend each other’s holistic well-being."}, "lines": 4},
+    {"say": "andrei", "text": "In Sikolohiyang Pilipino, marital ethics are defined by pakikipagkapwa and malasakit, active and empathetic care. Spouses must value each other as co-equal human beings, not as functional domestic labor."},
+    {"say": "andrei", "text": "Marriage is a union of two equal persons, kapwa, bound by a shared identity: hindi ibang-tao. As Lanaria (2014) points out, kapwa within the family rejects reducing a spouse to a mere household utility."},
+    {"say": "andrei", "text": "Bound by their vows in sickness and in health, spouses are morally obligated through malasakit to preserve, protect and defend each other's holistic well-being."},
+    {"say": "andrei", "text": "That includes preserving vital, therapist-recommended coping tools for postpartum anxiety, rather than stripping them away for short-term productivity."},
+    {"say": "andrei", "text": "The dilemma has been established. The court will now hear opening arguments."},
+    {"scene": "Opening Arguments", "k": "Scene 4"},
+    {"say": "andrei", "text": "I will step down from the bench briefly to state my own position."},
+    {"role": {"andrei": "Off the bench · Equity & Proper Dialogue"}},
+    {"say": "andrei", "text": "For the record, I am Keith Andrei, and I will argue through the lens of Equity and Proper Dialogue."},
+    {"say": "andrei", "text": "At the very least, proper communication with the husband must take place, so that the wife does not feel invalidated."},
+    {"shout": "TAKE THAT!", "by": "andrei"},
+    {"present": "remark"},
+    {"say": "andrei", "text": "Her husband claims that she only sits at her crochet full-time, without recognizing that she has already done all of these tasks."},
+    {"quote": 4, "part": "Mind you, my whole morning is cleaning or cooking and taking care of what needs to be done."},
+    {"present": "therapist"},
+    {"say": "andrei", "text": "It should be taken into account that crocheting is not merely a hobby. It is another form of treatment that helps OP regulate herself."},
+    {"say": "andrei", "text": "And when she is able to regulate her emotions, she will be able to contribute more."},
+    {"sfx": "gavel"},
+    {"role": {"andrei": null}},
+    {"say": "andrei", "text": "The moderator returns to the bench. Sophia, you have the floor."},
+    {"say": "sophia", "text": "May it please the court. I am Sophia, and I will argue through the lens of Pakikipagkapwa and Equal Consideration."},
+    {"say": "sophia", "text": "I also side with the wife. And yes, they need to talk, particularly about three things."},
+    {"say": "sophia", "text": "First, the husband's existing double standard."},
+    {"shout": "TAKE THAT!", "by": "sophia"},
+    {"present": "therapist"},
+    {"say": "sophia", "text": "Second, the wife's need for self-care and me-time for her well-being, which her therapist has approved. That counts in her favor."},
+    {"quote": 2, "part": "throughout the day or night I’m needed"},
+    {"say": "sophia", "text": "Third, and I consider this critical: after the child's nap time, the child still needs care throughout the day and night. To function, both of them need to stay healthy and rest."},
+    {"say": "sophia", "text": "The concept of pakikipagkapwa can also serve as a basis here. If they see each other as equals, as persons with equal rights, it becomes easier to understand each other's situation."},
+    {"say": "sophia", "text": "The husband also needs to show pagmamalasakit, genuine concern, because his wife is still recovering."},
+    {"say": "sophia", "text": "Would it be an overstatement to compare their need for rest with the law?"},
+    {"evidence": ["ra10361"]},
+    {"present": "ra10361"},
+    {"say": "sophia", "text": "Under the Batas Kasambahay, Section 20: “The domestic worker shall be entitled to an aggregate daily rest period of eight (8) hours per day.”"},
+    {"say": "sophia", "text": "And Section 21: “The domestic worker shall be entitled to at least twenty-four (24) consecutive hours of rest in a week.”"},
+    {"say": "sophia", "text": "If even domestic workers are entitled to rest, then so are the spouses, especially the wife."},
+    {"say": "sophia", "text": "That said, let us give the husband the benefit of the doubt and consider how he might see the situation."},
+    {"say": "sophia", "text": "First, an equal division of labor, or matching work shifts. Since he works a full-time job all day, he may believe that her “shift” at home should match his hours."},
+    {"say": "sophia", "text": "He may view the child's nap time as part of her working hours: time that should be spent crossing off chores, not taking personal breaks while things are still left undone."},
+    {"say": "sophia", "text": "Second, shared downtime. His logic is probably that if all the house chores are finished during the day, they can both actually relax together at night."},
+    {"say": "sophia", "text": "When he sees unfinished chores, he may panic, thinking he will have to clean after a long workday instead of resting."},
+    {"say": "sophia", "text": "Third, fairness or justice. Since he has no hobby and spends his working hours on job duties, he may perceive her downtime during the day as an unfair perk."},
+    {"say": "sophia", "text": "Marriage does not require spouses to contribute in identical ways or to make equal sacrifices at every moment. Instead, it emphasizes meeting each partner's needs so that both can flourish within the marriage."},
+    {"say": "sophia", "text": "By supporting a therapeutic activity recommended by his wife's psychologist, the husband demonstrates care and commitment to his spouse's long-term well-being."},
+    {"say": "sophia", "text": "In this sense, allowing time for crochet may ultimately strengthen the marriage, helping the wife manage stress, maintain emotional stability, and better fulfill her family responsibilities."},
+    {"say": "andrei", "text": "Thank you, Sophia. Stephen?"},
+    {"say": "stephen", "text": "May it please the court. I am Stephen, and I will argue through the lens of Care Ethics."},
+    {"say": "stephen", "text": "For me, the wife is not the asshole. She takes care of her child and does the household chores, so she deserves some time for herself."},
+    {"say": "stephen", "text": "Crocheting helps her manage her anxiety and maintain her mental well-being, so it is more than just a hobby."},
+    {"shout": "TAKE THAT!", "by": "stephen"},
+    {"present": "remark"},
+    {"say": "stephen", "text": "The husband is being unfair by assuming that she does nothing all day simply because he sees her resting or crocheting."},
+    {"quote": 4, "part": "He assumes I sit with my crochet hook and yarn all day just because he walks in to me doing that."},
+    {"say": "stephen", "text": "Being a mother and a wife does not mean she has to be productive every second of the day."},
+    {"say": "stephen", "text": "Both of them deserve rest, and the husband should respect her needs instead of making her feel guilty for having a hobby."},
+    {"say": "andrei", "text": "Noted. Karina, the floor is yours."},
+    {"say": "karina", "text": "May it please the court. I am Ma. Karina, and I will argue through the lens of Autonomy."},
+    {"say": "karina", "text": "My verdict is that the wife is not the asshole."},
+    {"say": "karina", "text": "I do not believe that being a mother means spending every waking moment doing something for her child or her family."},
+    {"say": "karina", "text": "As long as her child's needs are met and their safety is ensured, she should be allowed to enjoy her me-time without feeling guilty about it."},
+    {"shout": "TAKE THAT!", "by": "karina"},
+    {"present": "store"},
+    {"say": "karina", "text": "The fact that something can be bought in a store does not mean that making it yourself is pointless."},
+    {"say": "karina", "text": "The mother may not be crocheting because she needs a particular item. She may be crocheting because she enjoys the process, learning new techniques, and seeing something take shape through her own effort."},
+    {"say": "karina", "text": "Those things have value too, even if they are not necessary for the family's survival."},
+    {"say": "karina", "text": "Being a good mother does not mean you must stop being your own person. You can be a loving, responsible parent and still have hobbies and do things that make you happy."},
+    {"cue": "consensus"},
+    {"say": "andrei", "text": "It appears the court has reached a consensus. Every counsel finds that OP is not the asshole."},
+    {"say": "andrei", "text": "If there are no objections, the court will proceed to—", "interrupt": true},
+    {"stopMusic": true},
+    {"sfx": "door"},
+    {"flash": true},
+    {"shout": "HOLD IT!", "by": "mari"},
+    {"cue": "surprise"},
+    {"scene": "The Surprise Objection", "k": "Scene 5"},
+    {"say": "andrei", "text": "…Mari? The court did not expect you in this case."},
+    {"say": "mari", "text": "After reviewing the arguments made by this panel, I would like to challenge the consensus and present a perspective that agrees with the husband."},
+    {"say": "andrei", "text": "…The court will allow it. Proceed."},
+    {"say": "mari", "text": "May it please the court. I am Maricris, and I will argue through the lens of Equity."},
+    {"say": "mari", "text": "Sophia argued that the marriage is taking a hit because of inequalities in compromise, with the wife extending more grace while the husband responds only with resentment."},
+    {"say": "mari", "text": "However, the same can be argued for the husband's side."},
+    {"shout": "TAKE THAT!", "by": "mari"},
+    {"present": "post"},
+    {"say": "mari", "text": "OP's post shows bias and a lack of information about what her husband is going through as a result of having a child."},
+    {"say": "mari", "text": "I am not denying that postpartum depression is difficult. But we must also examine the husband's situation as the exhausted caregiver, the only foundation of the family able to provide for everyone during this difficult time in their marriage."},
+    {"say": "mari", "text": "Through the lens of equity, the husband may believe that marriage requires both spouses to make sacrifices for the family's benefit."},
+    {"say": "mari", "text": "Because he cannot engage in personal hobbies during his work hours, he may consider it fair for leisure activities to take place only after essential responsibilities have been completed."},
+    {"say": "mari", "text": "The husband's self-sacrifice may not be the same as the wife's, but that does not make it any less valid."},
+    {"sfx": "door"},
+    {"flash": true},
+    {"shout": "OBJECTION!", "by": "keziah"},
+    {"say": "andrei", "text": "Keziah as well? Very well. The court is listening."},
+    {"say": "keziah", "text": "May it please the court. I am Keziah Faith, and I will argue through the lens of the Ethics of Care and Equal Consideration."},
+    {"say": "keziah", "text": "Stephen, I understand your point that both of them deserve rest. That is precisely why I side with the husband."},
+    {"shout": "TAKE THAT!", "by": "keziah"},
+    {"present": "workload"},
+    {"say": "keziah", "text": "She has her crochet time, but he works full-time, has no hobby, and still comes home to chores. If both of them deserve rest, his rest should count too."},
+    {"say": "keziah", "text": "I also agree that he should not make her feel guilty. But respect and care should go both ways."},
+    {"say": "keziah", "text": "Nel Noddings (1984) holds that caring is a relationship, so it has to come from both sides. If we want him to notice how tired she is, she should also notice how tired he is."},
+    {"present": "post"},
+    {"say": "keziah", "text": "Furthermore, we only have the wife's side of the story."},
+    {"say": "keziah", "text": "Rachels argues that we should weigh everyone's interests equally (Rachels & Rachels, 2019), so I do not think it is fair to assume the worst about him."},
+    {"scene": "Cross-Examination", "k": "Scene 6"},
+    {"say": "andrei", "text": "The consensus has been challenged. Does the panel wish to respond?"},
+    {"shout": "OBJECTION!", "by": "sophia"},
+    {"say": "sophia", "text": "Equal consideration goes both ways."},
+    {"say": "sophia", "text": "If we are asking the wife to recognize her husband's exhaustion, then the husband should also recognize that her crochet time supports her mental health and is not simply a recreational activity."},
+    {"say": "andrei", "text": "I will step down once more, because the argument from equity deserves an answer."},
+    {"role": {"andrei": "Off the bench · Equity"}},
+    {"shout": "OBJECTION!", "by": "andrei"},
+    {"say": "andrei", "text": "Mari, when it comes to equity, it should be applied to the wife as well."},
+    {"say": "andrei", "text": "She should be given grace after suffering from postpartum anxiety and depression."},
+    {"sfx": "gavel"},
+    {"role": {"andrei": null}},
+    {"say": "andrei", "text": "Speaking again as moderator: whichever side one takes, proper dialogue between the spouses is still required."},
+    {"say": "andrei", "text": "Let us now examine what could actually be done."},
+    {"scene": "Courses of Action", "k": "Scene 7"},
+    {"say": "andrei", "text": "The court will now consider two opposing courses of action."},
+    {"info": {"k": "Course of Action 1", "t": "Prioritizing the Wife’s Psychological Self-Care", "icon": "bubble"}, "lines": 3},
+    {"say": "andrei", "text": "The first course of action: prioritize the wife's psychological self-care."},
+    {"say": "andrei", "text": "This preserves the nap-time crochet routine as a vital, non-negotiable intervention for postpartum anxiety, strengthening her stability, executive functioning and capacity to parent."},
+    {"say": "andrei", "text": "The trade-off is that domestic tasks will be delayed or left incomplete during that time."},
+    {"info": {"k": "Course of Action 2", "t": "Have an Honest and Open Conversation", "d": "Devise a plan on how they can delegate tasks based on equal and shared responsibilities.", "icon": "calendar"}, "lines": 4},
+    {"say": "andrei", "text": "The second course of action: have an honest and open conversation about their personal and relational difficulties, and devise a plan to delegate tasks based on equal and shared responsibilities."},
+    {"say": "andrei", "text": "This examines the couple's holistic conditions and allows them to hear each other's rationale for their differences."},
+    {"say": "andrei", "text": "It maintains an organized home, prevents work from piling up after hours, and could address the underlying issues causing burnout on both sides."},
+    {"say": "andrei", "text": "It is also necessary to determine whether they are still on the same page, or whether long-term resentment, rooted in unmanaged psychological strain, has made their marriage unhealthy."},
+    {"say": "andrei", "text": "Two paths, each with its own cost. The decision now passes to you."},
+    {"scene": "Your Verdict", "k": "Scene 8"},
+    {"cue": "verdict"},
+    {"say": "andrei", "text": "You have heard the case, the consensus and the objection. The court now asks: is OP the asshole?"},
+    {"choice": [{"text": "NTA — Not the Asshole", "goto": "case2_nta", "verdict": "nta"}, {"text": "YTA — You're the Asshole", "goto": "case2_yta", "verdict": "yta"}, {"text": "Neither — they need to talk", "goto": "case2_neither", "verdict": "neither"}]},
+  ],
+
+  case2_nta: [
+    {"say": "stephen", "text": "Being a mother and a wife does not mean she has to be productive every second of the day."},
+    {"say": "karina", "text": "Being a good mother does not mean you must stop being your own person."},
+    {"goto": "case2_end"},
+  ],
+
+  case2_yta: [
+    {"say": "mari", "text": "The husband's self-sacrifice may not be the same as the wife's, but that does not make it any less valid."},
+    {"say": "keziah", "text": "If both of them deserve rest, his rest should count too."},
+    {"goto": "case2_end"},
+  ],
+
+  case2_neither: [
+    {"say": "sophia", "text": "Equal consideration goes both ways."},
+    {"say": "andrei", "text": "Proper dialogue is still required."},
+    {"goto": "case2_end"},
+  ],
+
+  case2_end: [
+    {"scene": "The Panel's Resolution", "k": "Scene 9"},
+    {"say": "andrei", "text": "Before we close, the panel will share its own resolution."},
+    {"info": {"k": "Our Decision", "t": "Critical Information", "d": "Crocheting applied in the context of the author isn’t just a hobby but instead something that’s necessary for her mental health to improve.", "icon": "folder"}, "lines": 4},
+    {"say": "andrei", "text": "Our decision turns on one critical fact: the author was diagnosed with postpartum anxiety and depression, and crocheting became an integral part of her day to regulate her emotions."},
+    {"say": "andrei", "text": "In her context, crocheting is not just a hobby. It is necessary for her mental health to improve."},
+    {"say": "andrei", "text": "This calls for her husband's grace, where pakikiramdam and malasakit come in: an understanding without words. Already struggling, she would not want to ask him directly for help, not wanting to be a bother."},
+    {"say": "andrei", "text": "Instead, she turns to a hobby that eases her psychological struggles, for her own benefit and her family's. This calls for the husband to prioritize her mental health over the operational demands of household chores."},
+    {"info": {"k": "Final Resolution", "t": "Prioritizing the Wife’s Psychological Care", "d": "Prioritizing the wife's mental health is the more ethical and effective course of action because it preserves her well-being, strengthens her capacity to parent, and ultimately benefits the entire family.", "icon": "bubble"}, "lines": 3},
+    {"say": "andrei", "text": "The panel therefore resolves on prioritizing the wife's psychological care. Crochet is a tool that helps her regulate her emotions daily, allowing her to function as a wife and a parent."},
+    {"say": "andrei", "text": "It should also be noted that she only crochets during her down time, so no household tasks are halted."},
+    {"say": "andrei", "text": "Prioritizing her mental health preserves her well-being, strengthens her capacity to parent and benefits the whole family, whereas prioritizing constant productivity offers little benefit while carrying far greater emotional and relational risks."},
+    {"say": "andrei", "text": "A case that seemed unanimous turned out to have another side."},
+    {"say": "andrei", "text": "This concludes Case 2. Court is adjourned."},
+    {"sfx": "gavel"},
+    {"wait": 900},
+    {"endcard": "Case 2 Complete", "complete": "case2", "sub": "Court is adjourned. Thank you for deliberating.", "next": [{"label": "Library", "page": "libraryPage"}, {"label": "Play Case 1", "case": "case1"}, {"label": "Main Menu", "page": "title"}]},
+  ],
+
+};
+
+/* =========================================================
+   ENGINE — you don't need to edit below this line
+   ========================================================= */
+function ph(color, mood){
+  const eyes = {
+    normal:'<circle cx="82" cy="92" r="5"/><circle cx="118" cy="92" r="5"/>',
+    happy:'<path d="M75 94q7-9 14 0M111 94q7-9 14 0" stroke="#1b1035" stroke-width="4" fill="none" stroke-linecap="round"/>',
+    sad:'<circle cx="82" cy="95" r="5"/><circle cx="118" cy="95" r="5"/><path d="M72 82l16 5M128 82l-16 5" stroke="#1b1035" stroke-width="3"/>',
+    surprised:'<circle cx="82" cy="92" r="7"/><circle cx="118" cy="92" r="7"/>',
+  }[mood];
+  const mouth = {
+    normal:'<path d="M90 118h20" stroke="#1b1035" stroke-width="4" stroke-linecap="round"/>',
+    happy:'<path d="M86 114q14 14 28 0" stroke="#1b1035" stroke-width="4" fill="none" stroke-linecap="round"/>',
+    sad:'<path d="M88 122q12-10 24 0" stroke="#1b1035" stroke-width="4" fill="none" stroke-linecap="round"/>',
+    surprised:'<ellipse cx="100" cy="120" rx="7" ry="9" fill="#1b1035"/>',
+  }[mood];
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 420">
+    <path d="M20 420q0-230 80-230t80 230z" fill="${color}"/>
+    <rect x="86" y="160" width="28" height="40" fill="#f2d4c1"/>
+    <circle cx="100" cy="100" r="62" fill="#f2d4c1"/>
+    <path d="M38 100q0-70 62-70t62 70q-20-30-62-34q-42 4-62 34z" fill="${color}"/>
+    <g fill="#1b1035">${eyes}</g>${mouth}
+    <circle cx="74" cy="110" r="7" fill="${color}" opacity=".35"/><circle cx="126" cy="110" r="7" fill="${color}" opacity=".35"/>
+  </svg>`;
+  return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
+}
+
+const $ = id => document.getElementById(id);
+const esc = t => String(t).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const POS = { left:"25%", center:"50%", right:"75%", farleft:"12%", farright:"88%" };
+let S = null;          // current state
+let typing = null, fullText = "", autoMode = false, autoTimer = null, busy = false, muted = false;
+const log = [];
+
+function freshState(section){ return { section:section||"case1", i:0, bg:null, music:null, chars:{}, vars:{}, items:[], record:[], recordCase:null, roles:{} }; }
+
+function storageGet(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
+function storageSet(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } }
+
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.style.opacity=1; clearTimeout(t._h); t._h=setTimeout(()=>t.style.opacity=0,1600); }
+
+/* --- visuals --- */
+function bgValue(key){ const v = BACKGROUNDS[key] ?? key; return /^(linear|radial|conic)-gradient|^#|^rgb/.test(v) ? v : `url("${v}")`; }
+let bgFront = $("bg"), bgBack = $("bg2");
+function setBg(key, instant){
+  S.bg = key;
+  if(instant){ bgFront.style.background = bgValue(key); bgFront.style.backgroundSize="cover"; bgFront.style.opacity=1; bgBack.style.opacity=0; return; }
+  bgBack.style.background = bgValue(key); bgBack.style.backgroundSize="cover"; bgBack.style.backgroundPosition="center";
+  bgBack.style.opacity = 1; bgFront.style.opacity = 0;
+  [bgFront, bgBack] = [bgBack, bgFront];
+}
+function charEl(id){
+  let el = document.querySelector(`.char[data-id="${id}"]`);
+  if(!el){ el = document.createElement("div"); el.className="char"; el.dataset.id=id; el.innerHTML="<img alt=''>"; $("chars").appendChild(el); }
+  return el;
+}
+function showChar(id, mood, at){
+  const c = CHARACTERS[id]; if(!c) return console.warn("Unknown character:", id);
+  const prev = S.chars[id] || { mood:"normal", at:"center" };
+  const st = S.chars[id] = { mood: mood || prev.mood, at: at || prev.at };
+  const el = charEl(id);
+  el.querySelector("img").src = c.sprites[st.mood] || Object.values(c.sprites)[0];
+  el.style.left = POS[st.at] || st.at;
+  el.style.height = (c.size && c.size.h) || ""; el.style.bottom = (c.size && c.size.bottom) || "";
+  requestAnimationFrame(()=>el.classList.add("on"));
+}
+function hideChar(id){ delete S.chars[id]; const el=document.querySelector(`.char[data-id="${id}"]`); if(el){ el.classList.remove("on"); setTimeout(()=>{ if(!S.chars[id]) el.remove(); },500);} }
+function highlight(speaker){ document.querySelectorAll(".char").forEach(el=>el.classList.toggle("dim", !!speaker && el.dataset.id!==speaker)); }
+
+/* --- audio --- */
+function playMusic(src){
+  const m = $("music"); S.music = src;
+  if(!src){ m.pause(); m.removeAttribute("src"); return; }
+  if(m.getAttribute("src") === src && !m.paused) return;
+  m.src = src; m.volume = 0.45; m.muted = muted; m.play().catch(()=>{});
+}
+function playSfx(src, times){
+  src = SFX[src] || src; times = times || 1;
+  for(let k=0;k<times;k++) setTimeout(()=>{ const a = new Audio(src); a.muted = muted; a.volume = 0.9; a.play().catch(()=>{}); }, k*340);
+}
+
+/* --- text --- */
+function typeText(str, cb){
+  const el = $("text"); fullText = str; el.textContent = ""; $("next").classList.remove("show");
+  let n = 0;
+  clearInterval(typing);
+  typing = setInterval(()=>{ n++; el.textContent = str.slice(0,n); if(n>=str.length){ finishTyping(); cb&&cb(); } }, 22);
+}
+function finishTyping(){ clearInterval(typing); typing=null; $("text").textContent=fullText; $("next").classList.add("show");
+  if(autoMode){ clearTimeout(autoTimer); autoTimer=setTimeout(advance, 1200 + fullText.length*25); } }
+
+
+/* --- courtroom helpers --- */
+function soloChar(id, mood){
+  for(const other of Object.keys(S.chars)) if(other!==id) hideChar(other);
+  showChar(id, mood, "center");
+}
+function sceneCard(title, kicker){
+  busy = true; $("box").classList.add("hidden"); hidePresented(); hideQuote();
+  $("scK").textContent = kicker || ""; $("scT").textContent = title;
+  const el = $("sceneCard"); el.classList.remove("on"); void el.offsetWidth; el.classList.add("on");
+  log.push({ name:"", text:`— ${kicker ? kicker+": " : ""}${title} —` });
+  setTimeout(()=>{ el.classList.remove("on"); busy = false; run(); }, 2000);
+}
+function shoutSVG(text){
+  const pts = [], n = 22, cx = 500, cy = 210;
+  for(let k=0;k<n*2;k++){ const a = Math.PI*2*k/(n*2), r = k%2 ? 0.80 : 1.0, j = (k*37%11)/40; pts.push(`${(cx+Math.cos(a)*470*(r+j*0.15)).toFixed(0)},${(cy+Math.sin(a)*190*(r+j*0.2)).toFixed(0)}`); }
+  return `<svg viewBox="0 0 1000 420" role="img" aria-label="${esc(text)}">
+    <polygon points="${pts.join(" ")}" fill="#fffaf0" stroke="#f0c674" stroke-width="16" stroke-linejoin="round"/>
+    <text x="500" y="250" text-anchor="middle" font-family="Fraunces, Georgia, serif" font-weight="900" font-style="italic" font-size="${text.length>10?118:138}" fill="#0f2a5c" stroke="#f0c674" stroke-width="5" paint-order="stroke" letter-spacing="2">${esc(text)}</text>
+  </svg>`;
+}
+function shout(text, by){
+  busy = true; setAuto(false);
+  if(by && CHARACTERS[by]) soloChar(by);
+  $("box").classList.add("hidden");
+  const fx = $("shoutFx"); fx.innerHTML = shoutSVG(text); fx.classList.add("on");
+  playSfx("shout");
+  const g = $("game"); g.classList.remove("shake"); void g.offsetWidth; g.classList.add("shake");
+  log.push({ name: by && CHARACTERS[by] ? CHARACTERS[by].name : "", text });
+  setTimeout(()=>{ fx.classList.remove("on"); fx.innerHTML=""; g.classList.remove("shake"); busy = false; run(); }, 1050);
+}
+function evDef(id){ return (EVIDENCE[S.recordCase] || []).find(e=>e.id===id); }
+function evCardHTML(e, kicker){ return `<div class="ev-card">${pixelSVG(e.icon)}<div><div class="ev-k">${esc(kicker)}</div><div class="ev-n">${esc(e.name)}</div><div class="ev-d">${esc(e.desc)}</div></div></div>`; }
+function ensureRecord(caseKey){ if(S.recordCase !== caseKey){ S.recordCase = caseKey; S.record = S.record || []; } }
+function addEvidence(ids){
+  const id = ids.shift(); if(!id){ return run(); }
+  const e = evDef(id);
+  if(!e || S.record.includes(id)) return addEvidence(ids);
+  S.record.push(id); busy = true; $("box").classList.add("hidden");
+  const el = $("evAdd"); el.innerHTML = evCardHTML(e, "Evidence added to the Court Record"); el.classList.add("on");
+  playSfx("evidence"); refreshItemBtn(true);
+  log.push({ name:"", text:`[Evidence added: ${e.name}]` });
+  setTimeout(()=>{ el.classList.remove("on"); busy = false; addEvidence(ids); }, 1550);
+}
+let presentedLife = 0;
+function presentEvidence(id){
+  const e = evDef(id); if(!e) return console.warn("Unknown evidence", id);
+  const el = $("presented"); el.innerHTML = evCardHTML(e, "Presented"); el.classList.remove("on"); void el.offsetWidth; el.classList.add("on");
+  playSfx("evidence"); presentedLife = 2;
+  log.push({ name:"", text:`[Presents: ${e.name}]` });
+}
+function showInfo(c, lines){
+  const el = $("presented");
+  el.innerHTML = `<div class="ev-card info">${c.icon ? pixelSVG(c.icon) : ""}<div><div class="ev-k">${esc(c.k||"")}</div><div class="ev-n">${esc(c.t||"")}</div>${c.d?`<div class="ev-d">${esc(c.d)}</div>`:""}</div></div>`;
+  el.classList.remove("on"); void el.offsetWidth; el.classList.add("on");
+  presentedLife = (lines || 1) + 1;
+  log.push({ name:"", text:`[${c.k ? c.k+": " : ""}${c.t}]` });
+}
+function tickPresented(){ if(presentedLife > 0){ presentedLife--; if(presentedLife === 0) hidePresented(); } }
+function hidePresented(){ presentedLife = 0; $("presented").classList.remove("on"); }
+const PROGRESS_KEY = "aita_progress_v1";
+let progress = (()=>{ try{ return JSON.parse(localStorage.getItem(PROGRESS_KEY)) || {}; }catch(e){ return {}; } })();
+function saveProgress(){ try{ localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress)); }catch(e){} }
+function reflectionsUnlocked(){ return !!(progress.unlocked || (progress.case1 && progress.case2)); }
+function markComplete(caseKey){
+  const before = reflectionsUnlocked();
+  progress[caseKey] = true; saveProgress(); refreshReflectionsLock();
+  return !before && reflectionsUnlocked();
+}
+function endCard(step){
+  busy = true; $("box").classList.add("hidden"); hidePresented(); setAuto(false);
+  const justUnlocked = step.complete ? markComplete(step.complete) : false;
+  $("ecK").textContent = justUnlocked ? "🔓 Reflections Unlocked" : "The Court of Public Opinion"; $("ecTitle").textContent = step.endcard;
+  $("ecSub").textContent = justUnlocked ? "You've completed both cases. The panel's closing statements are now open." : (step.sub || "");
+  if(justUnlocked) playSfx("evidence");
+  $("ecBtns").innerHTML = "";
+  const nexts = (step.next || [{label:"Main Menu", page:"title"}]).slice();
+  if(justUnlocked) nexts.unshift({label:"🔓 Closing Statements", story:"closing"});
+  else if(step.complete && reflectionsUnlocked()) nexts.push({label:"Reflections", story:"closing"});
+  nexts.forEach((n,k)=>{
+    const b = document.createElement("button"); b.className = "menu-btn " + (k===0 ? "gold" : "blue"); b.textContent = n.label;
+    b.onclick = () => { $("endCard").classList.remove("on"); busy = false;
+      if(n.case) newGame(n.case);
+      else if(n.story) newGame(n.story);
+      else { toTitle(); if(n.page && n.page !== "title") showScreen(n.page); } };
+    $("ecBtns").appendChild(b);
+  });
+  $("endCard").classList.add("on"); $("ecBtns").firstChild && $("ecBtns").firstChild.focus();
+}
+
+
+/* --- quote ribbon (lines from OP's post) --- */
+let quoteLife = 0, quotePara = null;
+function showQuote(n, part){
+  const p = POSTS[postKey] || POSTS[S.recordCase]; if(!p) return;
+  const full = p.body[n] || ""; const txt = part && full.includes(part) ? part : full;
+  quotePara = n; quoteLife = 2;
+  const el = $("quoteRib"); el.innerHTML = `<span class="qk">From OP's post</span>“<mark>${esc(txt)}</mark>”`;
+  el.classList.remove("on"); void el.offsetWidth; el.classList.add("on");
+  log.push({ name:"", text:`[OP's post: “${txt}”]` });
+}
+function tickQuote(){ if(quoteLife > 0){ quoteLife--; if(quoteLife === 0) hideQuote(); } }
+function hideQuote(){ quoteLife = 0; $("quoteRib").classList.remove("on"); }
+$("quoteRib").onclick = e => { e.stopPropagation(); if(quotePara !== null){ openPost(postKey); highlightPara(quotePara); } };
+
+/* --- present-the-evidence challenge --- */
+let challenge = null, challengeWrong = 0, retryChallenge = false;
+function startChallenge(step){
+  challenge = step; challengeWrong = 0;
+  busy = true; setAuto(false);
+  openChallengeRecord();
+}
+function openChallengeRecord(){
+  if(!challenge){ retryChallenge = false; return; }
+  retryChallenge = false; busy = true; hidePresented();
+  openPost(postKey);
+  $("postWin").classList.add("presenting");
+  $("pwTitle").textContent = "Present Evidence"; $("pMin").textContent = "✕ Close";
+  $("pNote").textContent = challenge.challenge + (challengeWrong >= 2 && challenge.hint ? "  " + challenge.hint : "");
+  recSel = S.record.find(id=>id!=="post") || "post"; renderRecord();
+}
+function pausedChallenge(){
+  busy = false; retryChallenge = true;
+  $("box").classList.remove("hidden"); $("name").innerHTML = ""; $("text").classList.add("narration");
+  fullText = `${challenge.challenge} (Click here or open the Court Record to present evidence.)`;
+  $("text").textContent = fullText; $("next").classList.add("show");
+}
+function presentChoice(id){
+  const ok = challenge.accept && challenge.accept[id];
+  $("postWin").classList.remove("on","presenting");
+  if(ok){
+    const target = challenge.accept[id], by = challenge.by; challenge = null; retryChallenge = false;
+    busy = false;
+    S.vars.presented = id;
+    shoutThen("TAKE THAT!", by, () => { presentEvidence(id); jump(target); run(); });
+  } else {
+    challengeWrong++;
+    const e = evDef(id);
+    busy = false;
+    $("box").classList.remove("hidden");
+    soloChar("andrei");
+    $("name").innerHTML = `Andrei<span class="role">${esc(S.roles.andrei || CHARACTERS.andrei.role)}</span>`; $("name").style.background = CHARACTERS.andrei.color;
+    $("text").classList.remove("narration"); highlight("andrei");
+    const g = $("game"); g.classList.remove("shake"); void g.offsetWidth; g.classList.add("shake"); playSfx("gavel");
+    typeText(`${e ? `“${e.name}”? ` : ""}${challenge.wrong}${challengeWrong >= 2 && challenge.hint ? " " + challenge.hint : ""}`);
+    retryChallenge = true;
+  }
+}
+function shoutThen(text, by, cb){
+  busy = true;
+  if(by && CHARACTERS[by]) soloChar(by);
+  $("box").classList.add("hidden");
+  const fx = $("shoutFx"); fx.innerHTML = shoutSVG(text); fx.classList.add("on");
+  playSfx("shout");
+  const g = $("game"); g.classList.remove("shake"); void g.offsetWidth; g.classList.add("shake");
+  log.push({ name: by && CHARACTERS[by] ? CHARACTERS[by].name : "", text });
+  setTimeout(()=>{ fx.classList.remove("on"); fx.innerHTML=""; g.classList.remove("shake"); busy = false; cb(); }, 1050);
+}
+
+/* --- Reddit verdict reveal --- */
+const VERDICT_LABELS = { nta:"Not the Asshole", yta:"You're the Asshole", nb:"Not the asshole, but not blameless" };
+function revealVerdict(step){
+  busy = true; $("box").classList.add("hidden"); hidePresented(); hideQuote(); setAuto(false);
+  const p = POSTS[step.reveal] || {}; const you = S.vars.verdict, reddit = step.reddit;
+  $("rvFlair").innerHTML = `<span class="rv-flair">${esc(p.flair || VERDICT_LABELS[reddit] || "")}</span>`;
+  let note;
+  if(!you) note = "";
+  else if(you === reddit) note = `You ruled <b>${esc(VERDICT_LABELS[you])}</b>. You and Reddit agree.`;
+  else if(you === "nb" && reddit === "nta") note = `You ruled <b>${esc(VERDICT_LABELS[you])}</b>. Reddit cleared OP completely, while you found some fault. Where do you draw the line?`;
+  else note = `You ruled <b>${esc(VERDICT_LABELS[you])}</b>. You and Reddit disagree, and that's exactly what this discussion is for.`;
+  $("rvYou").innerHTML = note;
+  log.push({ name:"", text:`[Reddit's verdict: ${p.flair || VERDICT_LABELS[reddit]}]` });
+  $("revealCard").classList.add("on"); playSfx("gavel"); $("rvGo").focus();
+  $("rvGo").onclick = () => { $("revealCard").classList.remove("on"); busy = false; run(); };
+}
+
+/* --- runner --- */
+function evalCond(expr){ try{ return Function(...Object.keys(S.vars), `return (${expr});`)(...Object.values(S.vars)); }catch(e){ console.warn("Condition error:",expr,e); return false; } }
+function applySet(obj){ for(const k in obj){ S.vars[k] = (S.vars[k]||0) + obj[k]; } }
+function jump(section){ if(!STORY[section]) return console.error("No section named", section); S.section=section; S.i=0; }
+
+function advance(){
+  if(busy) return;
+  if(retryChallenge && !typing){ retryChallenge = false; openChallengeRecord(); return; }
+  if(typing){ finishTyping(); return; }
+  clearTimeout(autoTimer);
+  run();
+}
+
+function run(){
+  while(true){
+    const list = STORY[S.section]; const step = list && list[S.i];
+    if(!step){ console.warn("Story ran out in section", S.section); return endGame("THE END"); }
+    S.i++;
+    if(step.bg !== undefined){ setBg(step.bg); continue; }
+    if(step.music !== undefined){ playMusic(step.music); continue; }
+    if(step.sfx){ playSfx(step.sfx, step.times); continue; }
+    if(step.cue){ const src = CUES[step.cue] || CUES.default; if(src) playMusic(src); continue; }
+    if(step.role){ for(const k in step.role){ if(step.role[k]===null) delete S.roles[k]; else S.roles[k] = step.role[k]; } continue; }
+    if(step.scene){ return sceneCard(step.scene, step.k); }
+    if(step.shout){ return shout(step.shout, step.by); }
+    if(step.evidence){ return addEvidence(step.evidence.slice()); }
+    if(step.present){ presentEvidence(step.present); continue; }
+    if(step.info){ showInfo(step.info, step.lines); continue; }
+    if(step.flash){ const f=$("flashFx"); f.classList.remove("on"); void f.offsetWidth; f.classList.add("on"); continue; }
+    if(step.stopMusic){ playMusic(null); continue; }
+    if(step.endcard){ return endCard(step); }
+    if(step.quote !== undefined){ showQuote(step.quote, step.part); continue; }
+    if(step.challenge){ return startChallenge(step); }
+    if(step.reveal){ return revealVerdict(step); }
+    if(step.show){ showChar(step.show, step.mood, step.at); continue; }
+    if(step.hide){ hideChar(step.hide); continue; }
+    if(step.set){ applySet(step.set); continue; }
+    if(step.if){ const ok = evalCond(step.if); const target = ok ? step.goto : step.else; if(target) jump(target); continue; }
+    if(step.goto){ jump(step.goto); continue; }
+    if(step.wait){ busy=true; $("box").classList.add("hidden"); setTimeout(()=>{ busy=false; run(); }, step.wait); return; }
+    if(step.video){ return playVideo(step.video); }
+    if(step.post){ return openPost(step.post, true); }
+    if(step.highlight !== undefined){ highlightPara(step.highlight); continue; }
+    if(step.choice){ return showChoices(step.choice); }
+    if(step.end){ return endGame(step.end); }
+    if(step.say || step.text !== undefined){
+      $("box").classList.remove("hidden");
+      const c = step.say ? CHARACTERS[step.say] : null;
+      if(c){ soloChar(step.say, step.mood); }
+      const role = c ? (S.roles[step.say] || c.role || "") : "";
+      $("name").innerHTML = c ? `${esc(c.name)}${role?`<span class="role">${esc(role)}</span>`:""}` : esc(step.say || "");
+      $("name").style.background = c ? c.color : "";
+      $("text").classList.toggle("narration", !step.say);
+      highlight(step.say || "__none__");
+      tickPresented(); tickQuote();
+      log.push({ name: c ? c.name : "", text: step.text });
+      typeText(step.text, step.interrupt ? () => { busy = true; setTimeout(()=>{ busy = false; run(); }, 250); } : null);
+      return;
+    }
+    console.warn("Unknown step", step);
+  }
+}
+
+function showChoices(opts){
+  busy = true; $("next").classList.remove("show");
+  const box = $("choices"); box.innerHTML = "";
+  opts.forEach(o=>{
+    if(o.if && !evalCond(o.if)) return;
+    const b = document.createElement("button"); b.textContent = o.text;
+    b.onclick = e => { e.stopPropagation(); box.innerHTML=""; busy=false; log.push({name:"▶", text:o.text});
+      if(o.set) applySet(o.set); if(o.verdict) S.vars.verdict = o.verdict; if(o.goto) jump(o.goto); run(); };
+    box.appendChild(b);
+  });
+}
+
+function playVideo(src){
+  busy = true; const v = $("video"); const m = $("music");
+  const wasPlaying = !m.paused; m.pause();
+  $("box").classList.add("hidden");
+  v.src = src; v.muted = muted; v.style.display="block"; $("skipVideo").style.display="block";
+  const done = () => { v.pause(); v.style.display="none"; $("skipVideo").style.display="none"; v.onended=null; busy=false; if(wasPlaying) m.play().catch(()=>{}); run(); };
+  v.onended = done; $("skipVideo").onclick = e => { e.stopPropagation(); done(); };
+  v.play().catch(()=>done());
+}
+
+function endGame(label){
+  busy = true; $("box").classList.add("hidden");
+  const f = $("fade"); f.style.opacity = 1;
+  setTimeout(()=>{ toTitle(); f.style.opacity = 0; busy=false; }, 1200);
+}
+
+/* --- start / title --- */
+function clearScene(){ challenge=null; retryChallenge=false; hideQuote(); $("postWin").classList.remove("presenting"); ["shoutFx","evAdd","sceneCard","endCard","revealCard"].forEach(id=>$(id).classList.remove("on")); hidePresented(); $("game").classList.remove("shake"); $("postWin").classList.remove("on"); postWaiting=false; $("itemBtn").classList.remove("show"); $("chars").innerHTML=""; $("choices").innerHTML=""; $("box").classList.add("hidden"); log.length=0; }
+const MENU_SCREENS = ["title","casePage","teamPage","libraryPage"];
+let audioUnlocked = false;
+function syncMenuMusic(){
+  const mm = $("menuMusic"), cur = document.querySelector(".screen.on:not(.leaving)");
+  const inMenu = !!cur && MENU_SCREENS.includes(cur.id);
+  $("menuMute").classList.toggle("show", inMenu);
+  mm.muted = muted;
+  if(inMenu && audioUnlocked){ mm.volume = 0.5; if(mm.paused) mm.play().catch(()=>{}); }
+  else if(!inMenu){ mm.pause(); }
+}
+function showScreen(id){ document.querySelectorAll(".screen").forEach(s=>s.classList.toggle("on", s.id===id)); syncMenuMusic(); }
+function newGame(section){ S = freshState(section); clearScene(); setBg("dark", true); showScreen(null); $("menu").style.display="flex"; run(); }
+function toTitle(){ challenge=null; retryChallenge=false; hideQuote(); $("postWin").classList.remove("presenting"); ["shoutFx","evAdd","sceneCard","endCard","revealCard"].forEach(id=>$(id).classList.remove("on")); hidePresented(); $("itemBtn").classList.remove("show"); $("postWin").classList.remove("on"); playMusic(null); setAuto(false); closePanels(); showScreen("title"); $("menu").style.display="none"; $("gameSub").textContent=GAME.tagline; }
+
+/* --- save / load --- */
+const SLOTS = 6;
+function openSlots(mode){
+  $("slotTitle").textContent = mode === "save" ? "Save Game" : "Load Game";
+  const list = $("slotList"); list.innerHTML = "";
+  for(let k=1;k<=SLOTS;k++){
+    const d = storageGet("vn_slot_"+k);
+    const el = document.createElement("div"); el.className="slot";
+    el.innerHTML = d ? `<b>Slot ${k}</b><small>${d.date}</small><small>${(d.preview||"").slice(0,60)}</small>` : `<b>Slot ${k}</b><small>Empty</small>`;
+    el.onclick = () => {
+      if(mode==="save"){
+        const snap = JSON.parse(JSON.stringify(S)); snap.i = Math.max(0, S.i-1);
+        const ok = storageSet("vn_slot_"+k, { state:snap, date:new Date().toLocaleString(), preview:fullText });
+        toast(ok ? "Saved to slot "+k : "Saving isn't available in this browser"); openSlots("save");
+      } else if(d){ loadState(d.state); closePanels(); toast("Loaded slot "+k); }
+    };
+    list.appendChild(el);
+  }
+  $("slotPanel").style.display="block";
+}
+function loadState(st){
+  clearScene(); S = JSON.parse(JSON.stringify(st));
+  showScreen(null); $("menu").style.display="flex";
+  setBg(S.bg || "dark", true);
+  S.items = S.items || []; S.record = S.record || []; S.roles = S.roles || {}; refreshItemBtn(false);
+  const chars = S.chars; S.chars = {};
+  for(const id in chars) showChar(id, chars[id].mood, chars[id].at);
+  if(S.music) playMusic(S.music);
+  run();
+}
+function closePanels(){ document.querySelectorAll(".panel").forEach(p=>p.style.display="none"); }
+
+/* --- auto --- */
+function setAuto(on){ autoMode=on; $("bAuto").classList.toggle("active",on); clearTimeout(autoTimer); if(on && !typing && !busy && $("next").classList.contains("show")) autoTimer=setTimeout(advance,1200); }
+
+/* --- wire up --- */
+$("gameSub").textContent = GAME.tagline; document.title = GAME.title;
+if(GAME.logo) $("logoWrap").innerHTML = `<img src="${GAME.logo}" alt="${GAME.title}">`;
+if(GAME.background) document.querySelectorAll("#titleBg").forEach(b=>{ b.classList.remove("placeholder"); b.style.backgroundImage=`url("${GAME.background}")`; });
+$("bStart").onclick = () => showScreen("casePage");
+$("menuMusic").src = GAME.menuMusic;
+function unlockAudio(){ if(audioUnlocked) return; audioUnlocked = true; syncMenuMusic(); }
+["pointerdown","keydown"].forEach(ev=>document.addEventListener(ev, unlockAudio, {capture:true}));
+$("menuMute").onclick = () => { muted = !muted; $("music").muted = muted; $("video").muted = muted; $("bMute").textContent = muted?"🔇":"🔊"; $("menuMute").classList.toggle("off", muted); syncMenuMusic(); };
+function leaveSplash(){
+  const sp = $("splash"); if(!sp.classList.contains("on") || sp.classList.contains("leaving")) return;
+  audioUnlocked = true;
+  sp.classList.add("leaving");
+  $("title").classList.add("on"); syncMenuMusic();   // music starts right away
+  setTimeout(()=>{ sp.classList.remove("on","leaving"); }, 800);
+}
+$("splash").onclick = leaveSplash;
+$("splash").onkeydown = e => { if(e.key==="Enter"||e.key===" "){ e.preventDefault(); leaveSplash(); } };
+document.addEventListener("keydown", e => { if($("splash").classList.contains("on") && !e.repeat) leaveSplash(); });
+syncMenuMusic();
+$("caseRow").innerHTML = CASES.map((c,i)=>`<button class="case-card" data-case="${i}"><img src="${c.image}" alt="${c.label}: ${esc(c.title)}"><span>${c.label}</span></button>`).join("");
+let pendingCase = null;
+function askCase(i){ pendingCase = CASES[i]; $("cTitle").textContent = `Do you want to play ${pendingCase.label}?`; $("cSub").textContent = `“${pendingCase.title}”`; $("confirm").classList.add("on"); $("cYes").focus(); }
+function closeConfirm(){ $("confirm").classList.remove("on"); pendingCase = null; }
+document.querySelectorAll("[data-case]").forEach(b=>b.onclick=()=>askCase(+b.dataset.case));
+$("cYes").onclick = () => { const c = pendingCase; closeConfirm(); if(c) newGame(c.story); };
+$("cNo").onclick = closeConfirm;
+$("confirm").onclick = e => { if(e.target.id==="confirm") closeConfirm(); };
+document.addEventListener("keydown", e => { if($("confirm").classList.contains("on") && e.key==="Escape") closeConfirm(); });
+document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>showScreen(b.dataset.page));
+$("box").onclick = advance;
+$("bAuto").onclick = () => setAuto(!autoMode);
+$("bLog").onclick = () => { $("logList").innerHTML = log.map(l=>`<div class="log-line">${l.name?`<b>${l.name}:</b> `:""}${l.text.replace(/</g,"&lt;")}</div>`).join("") || "<p>Nothing yet.</p>"; $("logPanel").style.display="block"; $("logPanel").scrollTop=1e9; };
+$("bSave").onclick = () => openSlots("save");
+$("bLoad").onclick = () => openSlots("load");
+$("bMute").onclick = () => { muted=!muted; $("music").muted=muted; $("video").muted=muted; $("bMute").textContent = muted?"🔇":"🔊"; $("menuMute").classList.toggle("off", muted); };
+$("bFull").onclick = () => { try{ document.fullscreenElement ? document.exitFullscreen() : $("game").requestFullscreen().catch(()=>toast("Fullscreen not allowed here")); }catch(e){ toast("Fullscreen not allowed here"); } };
+$("bTitle").onclick = toTitle;
+
+/* --- team info page --- */
+const PEOPLE = TEAM.flatMap(g=>g.members.map(m=>({...m, topic:g.topic, color:g.color})));
+let pIndex = 0, pTyping = null;
+$("teamGrid").innerHTML = TEAM.map(g=>`<section class="group"><h3>${esc(g.group)}</h3><div class="glass">${
+  g.members.map(m=>{ const i = PEOPLE.findIndex(p=>p.name===m.name);
+    return `<button class="pcard ${g.color}" data-person="${i}"><span class="qicon${m.photo?" has-photo":""}">${m.photo?`<img src="${m.photo}" alt="" style="${m.thumbFit==="contain"?"object-fit:contain":""}">`:"?"}</span><b>${esc(m.name)}</b><span class="prog">${esc(m.role||"")}</span></button>`; }).join("")
+}</div></section>`).join("");
+document.querySelectorAll("[data-person]").forEach(b=>b.onclick=()=>openProfile(+b.dataset.person));
+function openProfile(i){
+  pIndex = (i + PEOPLE.length) % PEOPLE.length; const p = PEOPLE[pIndex];
+  $("pPhoto").innerHTML = p.photo ? `<img src="${p.photo}" alt="${esc(p.name)}" class="${p.thumbFit==="contain"?"contain":""}">` : `<span class="ph">?</span>`;
+  $("pTopic").textContent = p.topic; $("pName").textContent = p.name;
+  $("pRole").textContent = p.role || "—"; $("pLikes").textContent = p.likes; $("pDislikes").textContent = p.dislikes;
+  $("pCount").textContent = `${pIndex+1} / ${PEOPLE.length}`;
+  $("profile").classList.add("on");
+  clearInterval(pTyping); let n = 0; const d = $("pDialog"), t = p.dialogue;
+  pTyping = setInterval(()=>{ n++; d.innerHTML = esc(t.slice(0,n)) + '<span class="caret"></span>'; if(n>=t.length) clearInterval(pTyping); }, 28);
+}
+function closeProfile(){ clearInterval(pTyping); $("profile").classList.remove("on"); }
+$("pClose").onclick = closeProfile;
+$("profile").onclick = e => { if(e.target.id==="profile") closeProfile(); };
+$("pPrev").onclick = () => openProfile(pIndex-1);
+$("pNext").onclick = () => openProfile(pIndex+1);
+document.addEventListener("keydown", e => {
+  if(!$("teamPage").classList.contains("on")) return;
+  const open = $("profile").classList.contains("on");
+  if(e.key==="Escape"){ open ? closeProfile() : showScreen("title"); }
+  else if(open && e.key==="ArrowLeft") openProfile(pIndex-1);
+  else if(open && e.key==="ArrowRight") openProfile(pIndex+1);
+});
+
+/* --- library page --- */
+const PIX = {
+  doc:{ pal:{k:"#1a1a1a",w:"#ffffff",g:"#7a7a7a",s:"#d9d9d9"}, map:[
+    "kkkkkkkkkk....",
+    "kwwwwwwwwkk...",
+    "kwwwwwwwwksk..",
+    "kwwwwwwwwkssk.",
+    "kwgggggwwkkkkk",
+    "kwwwwwwwwwwwwk",
+    "kwggggggggggwk",
+    "kwwwwwwwwwwwwk",
+    "kwggggggggggwk",
+    "kwwwwwwwwwwwwk",
+    "kwggggggggggwk",
+    "kwwwwwwwwwwwwk",
+    "kwggggggggggwk",
+    "kwwwwwwwwwwwwk",
+    "kwgggggggwwwwk",
+    "kwwwwwwwwwwwwk",
+    "kkkkkkkkkkkkkk"]},
+  stamp:{ pal:{k:"#1c1c1c",h:"#3a3a3a",r:"#d83a2e",d:"#8f1d16",w:"#ffffff",g:"#9a9a9a",e:"#cfcfcf"}, map:[
+    ".......kkkk.......",
+    "......khhhhk......",
+    "......khhhhk......",
+    ".......kkkk.......",
+    "........kk........",
+    "........kk........",
+    "....kkkkkkkkkk....",
+    "...krrrrrrrrrrk...",
+    "...krrrrrrrrrrk...",
+    "...kddddddddddk...",
+    ".eekkkkkkkkkkkkee.",
+    "ewwwwwwwwwwwwwwwwe",
+    "ewggggggwwwwwwwwwe",
+    "ewwwwwwggggggggwwe",
+    "ewggggggggwwwwwwwe",
+    "ewwwwwwwwwwwwwwwwe",
+    ".eeeeeeeeeeeeeeee."]},
+  post:{ pal:{k:"#1a1a1b",w:"#ffffff",o:"#ff4500",g:"#8a8a8a",b:"#1a1a1b",l:"#d7dadc"}, map:[
+    "kkkkkkkkkkkkkkkk",
+    "kwwwwwwwwwwwwwwk",
+    "kwoowwgggggwwwwk",
+    "kwoowwwwwwwwwwwk",
+    "kwwwwwwwwwwwwwwk",
+    "kwbbbbbbbbbbbwwk",
+    "kwbbbbbbbbwwwwwk",
+    "kwwwwwwwwwwwwwwk",
+    "kwggggggggggggwk",
+    "kwggggggggggwwwk",
+    "kwggggggggggggwk",
+    "kwgggggggwwwwwwk",
+    "kwwwwwwwwwwwwwwk",
+    "kwllwllllwllllwk",
+    "kwwwwwwwwwwwwwwk",
+    "kkkkkkkkkkkkkkkk"]},
+  bubble:{ pal:{k:"#1a1a1a",w:"#ffffff",g:"#7a7a7a"}, map:[
+    "..kkkkkkkkkkkk..",
+    ".kwwwwwwwwwwwwk.",
+    "kwwwwwwwwwwwwwwk",
+    "kwwggggggggggwwk",
+    "kwwwwwwwwwwwwwwk",
+    "kwwggggggggwwwwk",
+    "kwwwwwwwwwwwwwwk",
+    ".kwwwwwwwwwwwwk.",
+    "..kkkwwkkkkkkk..",
+    "....kwwk........",
+    "....kwk.........",
+    "....kk.........."]},
+  angry:{ pal:{k:"#3a0d08",w:"#e0483a",g:"#fff2ec"}, map:[
+    "..kkkkkkkkkkkk..",
+    ".kwwwwwwwwwwwwk.",
+    "kwwwwwwggwwwwwwk",
+    "kwwwwwwggwwwwwwk",
+    "kwwwwwwggwwwwwwk",
+    "kwwwwwwwwwwwwwwk",
+    "kwwwwwwggwwwwwwk",
+    ".kwwwwwwwwwwwwk.",
+    "..kkkwwkkkkkkk..",
+    "....kwwk........",
+    "....kwk.........",
+    "....kk.........."]},
+  calendar:{ pal:{k:"#1a1a1a",r:"#c9473a",w:"#ffffff",g:"#9aa3ad",b:"#2f5fb3"}, map:[
+    "kkkkkkkkkkkkkk",
+    "krrkrrrrrrkrrk",
+    "krrkrrrrrrkrrk",
+    "kkkkkkkkkkkkkk",
+    "kwwwwwwwwwwwwk",
+    "kwgwgwgwgwgwwk",
+    "kwwwwwwwwwwwwk",
+    "kwgwgwbbwgwgwk",
+    "kwwwwwbbwwwwwk",
+    "kwgwgwgwgwwwwk",
+    "kwwwwwwwwwwwwk",
+    "kkkkkkkkkkkkkk"]},
+  slides:{ pal:{k:"#1a1a1a",p:"#7d2ae8",w:"#ffffff",y:"#00c4cc",g:"#9aa3ad",s:"#5a3a1a"}, map:[
+    "kkkkkkkkkkkkkkkk",
+    "kppppppppppppppk",
+    "kwwwwwwwwwwwwwwk",
+    "kwyyyywwggggggwk",
+    "kwyyyywwwwwwwwwk",
+    "kwyyyywwgggggwwk",
+    "kwwwwwwwwwwwwwwk",
+    "kwwwwwwwggggwwwk",
+    "kwwwwwwwwwwwwwwk",
+    "kkkkkkkkkkkkkkkk",
+    ".......ss.......",
+    "......ssss......",
+    ".....ss..ss....."]},
+  book:{ pal:{k:"#2a1404",r:"#8a1f1f",R:"#b83a2e",g:"#f0c674",p:"#fff4dc"}, map:[
+    "..kkkkkkkkkkkk",
+    ".kRRRRRRRRRRRk",
+    "krRRRRRRRRRRRk",
+    "krRRggggggRRRk",
+    "krRRgRRRRgRRRk",
+    "krRRggggggRRRk",
+    "krRRRRRRRRRRRk",
+    "krRRRRRRRRRRRk",
+    "krRRRggggRRRRk",
+    "krRRRRRRRRRRRk",
+    "krRRRRRRRRRRRk",
+    "krRRRRRRRRRRRk",
+    "krpppppppppppk",
+    "kkkkkkkkkkkkkk"]},
+  folder:{ pal:{k:"#3b2a10",y:"#e3a93a",Y:"#f6c95a",w:"#ffffff",g:"#9aa3ad",d:"#c48a22"}, map:[
+    "..........kkkkk...",
+    ".kkkkkk..kwwwwwk..",
+    "kyyyyyyk.kwggggk..",
+    "kyyyyyyykkwwwwwwk.",
+    "kyyyyyyyyyyyyyyyyk",
+    "kkkkkkkkkkkkkkkkkk",
+    "kYYYYYYYYYYYYYYYYk",
+    "kYYYYYYYYYYYYYYYYk",
+    "kYYYYYYYYYYYYYYYYk",
+    "kYYYYYYYYYYYYYYYYk",
+    "kYYYYYYYYYYkkkkYYk",
+    "kYYYYYYYYYYkddkYYk",
+    "kYYYYYYYYYYkkkkYYk",
+    "kYYYYYYYYYYYYYYYYk",
+    "kkkkkkkkkkkkkkkkkk"]},
+};
+function pixelSVG(name){
+  const ic = PIX[name] || PIX.doc, h = ic.map.length, w = Math.max(...ic.map.map(r=>r.length)); let r = "";
+  ic.map.forEach((row,y)=>[...row].forEach((c,x)=>{ if(ic.pal[c]) r += `<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="${ic.pal[c]}"/>`; }));
+  return `<svg viewBox="0 0 ${w} ${h}" shape-rendering="crispEdges" aria-hidden="true">${r}</svg>`;
+}
+const DOCS = LIBRARY.flatMap(sh=>sh.docs);
+function bookSpines(seed, side){
+  const cols=["#7a1f1f","#1f3f7a","#2f5a32","#6b4a1f","#4a2a5a","#8a6a2a","#233a5c","#5c2323"];
+  let r = seed*7 + (side==="l"?1:13), out = "";
+  const rnd = () => (r = (r*9301+49297)%233280) / 233280;
+  const n = 5 + Math.floor(rnd()*3);
+  for(let k=0;k<n;k++){
+    const h = 55 + rnd()*40, w = 10 + rnd()*8, tilt = (side==="r" && k===n-1) || (side==="l" && k===0 && seed%2) ? " tilt" : "";
+    out += `<i class="${tilt}" style="height:clamp(${(h*.55).toFixed(0)}px,${(h/14).toFixed(2)}vw,${h.toFixed(0)}px);width:clamp(${(w*.6).toFixed(0)}px,${(w/16).toFixed(2)}vw,${w.toFixed(0)}px);background:${cols[Math.floor(rnd()*cols.length)]}"></i>`;
+  }
+  return `<div class="books ${side}" aria-hidden="true">${out}</div>`;
+}
+$("shelves").innerHTML = LIBRARY.map((sh,si)=>`<div class="shelf">
+  <div class="shelf-items">${bookSpines(si,"l")}${bookSpines(si,"r")}${sh.docs.map(d=> d.reflections
+    ? `<button class="doc" data-refl aria-label="Team Reflections">${pixelSVG(d.icon)}<span class="lock" aria-hidden="true">🔒</span></button>`
+    : d.post
+    ? `<button class="doc" data-post="${esc(d.post)}" aria-label="Read ${esc(d.title)}">${pixelSVG(d.icon)}</button>`
+    : d.link
+    ? `<a class="doc" href="${esc(d.link)}" target="_blank" rel="noopener" aria-label="Open ${esc(d.title)} in Google Drive">${pixelSVG(d.icon)}</a>`
+    : `<button class="doc" data-soon aria-label="${esc(d.title)} (coming soon)">${pixelSVG(d.icon)}</button>`).join("")}</div>
+  <div class="plank"><span class="plaque">${esc(sh.shelf)}</span></div>
+  <div class="doc-labels">${sh.docs.map(d=>`<span>${esc(d.title)}</span>`).join("")}</div>
+</div>`).join("");
+document.querySelectorAll("[data-soon]").forEach(b=>b.onclick=()=>toast("Link coming soon"));
+document.querySelectorAll("[data-post]").forEach(b=>b.onclick=()=>openPost(b.dataset.post));
+document.addEventListener("keydown", e => { if($("libraryPage").classList.contains("on") && e.key==="Escape") showScreen("title"); });
+
+/* --- court record (case file + evidence) --- */
+let postKey = null, postWaiting = false, recSel = "post", recInGame = false;
+$("itemIcon").innerHTML = pixelSVG("doc").replace(/^<svg[^>]*>|<\/svg>$/g,"");
+$("itemIcon").setAttribute("viewBox", pixelSVG("doc").match(/viewBox="([^"]+)"/)[1]);
+function postHTML(key){
+  const p = POSTS[key]; if(!p) return "";
+  return `<div class="rmeta"><span class="av">r/</span><b>${esc(p.sub)}</b><span>• Posted by ${esc(p.author)}</span></div>
+    <div class="rtitle" id="pTitleR">${esc(p.title)}</div>
+    ${p.showFlair && p.flair ? `<span class="rflair">${esc(p.flair)}</span>` : ""}
+    <div class="rbody">${p.body.map((t,n)=>`<p data-para="${n}">${esc(t)}</p>`).join("")}</div>
+    <div class="rfoot"><span>⬆ Vote ⬇</span><span>💬 Comments</span><span>↗ Share</span></div>`;
+}
+function renderRecord(){
+  if(!postKey && REFLECTIONS.some(r=>r.who===recSel) || recSel==="__syn"){ return renderReflections(); }
+  const list = $("recList");
+  const ids = recInGame && S && S.record ? S.record : [];
+  list.hidden = ids.length < 2;
+  list.innerHTML = ids.map(id=>{ const e = evDef(id); return e ? `<button class="rec-item${id===recSel?" sel":""}" data-ev="${id}">${pixelSVG(e.icon)}<span>${esc(e.name)}</span></button>` : ""; }).join("");
+  list.querySelectorAll("[data-ev]").forEach(b=>b.onclick=()=>{ recSel = b.dataset.ev; renderRecord(); $("pScroll").scrollTop = 0; });
+  const presentBtn = challenge ? `<button class="menu-btn gold present-btn" id="evPresent">Present ${recSel==="post" ? "OP's Post" : "this evidence"} ▶</button>` : "";
+  if(recSel === "post" || !recInGame){ $("pScroll").innerHTML = (challenge ? `<div style="margin-bottom:1em">${presentBtn}</div>` : "") + postHTML(postKey); wirePresent(); return; }
+  const e = evDef(recSel), p = POSTS[postKey];
+  $("pScroll").innerHTML = `<div class="ev-detail"><div class="ev-head">${pixelSVG(e.icon)}<div><h4>${esc(e.name)}</h4><div class="ev-desc">${esc(e.desc)}</div></div></div>
+    ${(e.paras||[]).length && p ? `<div><b>From OP's post:</b></div>${e.paras.map(n=>`<div class="ev-quote">${esc(p.body[n]||"")}</div>`).join("")}<button class="menu-btn blue" id="evGo">Show in OP's post ↗</button>` : ""}</div>`;
+  if(challenge) $("pScroll").querySelector(".ev-detail").insertAdjacentHTML("afterbegin", presentBtn);
+  const go = $("evGo"); if(go) go.onclick = () => { const first = e.paras[0]; recSel = "post"; renderRecord(); highlightPara(first); };
+  wirePresent();
+}
+function wirePresent(){ const b = $("evPresent"); if(b) b.onclick = () => presentChoice(recSel); }
+function giveItem(key){ ensureRecord(key); if(!S.items.includes(key)) S.items.push(key); if(!S.record.includes("post")) S.record.unshift("post"); postKey = key; refreshItemBtn(true); }
+function refreshItemBtn(isNew){ const has = S && S.items && S.items.length; $("itemBtn").classList.toggle("show", !!has); if(isNew){ $("itemBtn").classList.remove("new"); void $("itemBtn").offsetWidth; $("itemBtn").classList.add("new"); } if(has) postKey = S.items[S.items.length-1]; }
+function openPost(key, fromStory){
+  const inLib = $("libraryPage").classList.contains("on");
+  recInGame = !inLib; postKey = key; recSel = "post";
+  if(fromStory) giveItem(key);
+  $("pwTitle").textContent = inLib ? "Case File" : "Court Record";
+  renderRecord(); $("pScroll").scrollTop = 0;
+  postWaiting = !!fromStory; if(fromStory){ busy = true; $("box").classList.add("hidden"); }
+  $("pNote").textContent = fromStory ? "Read OP's post, then press Minimize to begin. It stays in your Court Record (top-left)." : (inLib ? "Press Minimize (or Esc) to return to the Library." : "Press Minimize (or Esc) to return to the court.");
+  $("postWin").classList.remove("big"); $("pBig").textContent = "⤢ Enlarge"; $("pMin").textContent = "— Minimize";
+  $("postWin").classList.add("on"); setAuto(false);
+}
+function minimizePost(){
+  if(challenge){ $("postWin").classList.remove("on","presenting"); pausedChallenge(); return; }
+  $("postWin").classList.remove("on");
+  if(postWaiting){ postWaiting = false; busy = false; toast("OP's post added to the Court Record"); run(); }
+}
+function highlightPara(n){
+  if(n===null || n===false){ document.querySelectorAll(".rbody p").forEach(p=>p.classList.remove("hl")); return; }
+  if(!$("postWin").classList.contains("on")){ openPost(postKey); }
+  if(recSel !== "post"){ recSel = "post"; renderRecord(); }
+  document.querySelectorAll(".rbody p").forEach(p=>p.classList.remove("hl"));
+  const el = document.querySelector(`.rbody p[data-para="${n}"]`); if(el){ el.classList.add("hl"); el.scrollIntoView({block:"center"}); }
+}
+$("itemBtn").onclick = e => { e.stopPropagation(); if(challenge){ openChallengeRecord(); return; } if(postKey) openPost(postKey); };
+$("pMin").onclick = minimizePost;
+$("pBig").onclick = () => { const big = $("postWin").classList.toggle("big"); $("pBig").textContent = big ? "⤡ Shrink" : "⤢ Enlarge"; };
+$("postWin").onclick = e => { if(e.target.id==="postWin") minimizePost(); };
+document.addEventListener("keydown", e => {
+  if(!$("postWin").classList.contains("on")) return;
+  if(e.key==="Escape"){ minimizePost(); }
+  e.stopImmediatePropagation();   // don't advance dialogue while reading
+}, true);
+
+/* --- reflections (unlockable) --- */
+function refreshReflectionsLock(){
+  const on = reflectionsUnlocked(), b = $("bRefl");
+  if(b){ b.classList.toggle("locked", !on); b.textContent = on ? "Reflections" : "🔒 Reflections"; }
+  document.querySelectorAll("[data-refl]").forEach(d=>{ d.classList.toggle("locked", !on); const l=d.querySelector(".lock"); if(l) l.style.display = on ? "none" : ""; });
+}
+function lockedToast(){ toast(`Finish both cases to unlock — Case 1 ${progress.case1?"✓":"✗"} · Case 2 ${progress.case2?"✓":"✗"}`); }
+$("bRefl").onclick = e => {
+  if(e.shiftKey){ progress.unlocked = !progress.unlocked; saveProgress(); refreshReflectionsLock(); toast(progress.unlocked ? "Reflections unlocked (presenter mode)" : "Presenter unlock turned off"); return; }
+  if(!reflectionsUnlocked()) return lockedToast();
+  newGame("closing");
+};
+function openReflections(){
+  if(!reflectionsUnlocked()) return lockedToast();
+  recInGame = true; postKey = null; recSel = REFLECTIONS[0].who;
+  $("pwTitle").textContent = "Team Reflections"; $("pMin").textContent = "— Minimize";
+  $("pNote").textContent = "Press Minimize (or Esc) to return to the Library.";
+  renderReflections(); $("postWin").classList.remove("big"); $("pBig").textContent = "⤢ Enlarge"; $("postWin").classList.add("on");
+}
+function renderReflections(){
+  const items = REFLECTIONS.map(r=>({id:r.who, name:r.name})).concat([{id:"__syn", name:"Group Synthesis"}]);
+  const list = $("recList"); list.hidden = false;
+  list.innerHTML = items.map(it=>`<button class="rec-item${it.id===recSel?" sel":""}" data-rf="${it.id}">${pixelSVG(it.id==="__syn"?"folder":"bubble")}<span>${esc(it.name)}</span></button>`).join("");
+  list.querySelectorAll("[data-rf]").forEach(b=>b.onclick=()=>{ recSel=b.dataset.rf; renderReflections(); $("pScroll").scrollTop=0; });
+  let html;
+  if(recSel==="__syn") html = `<div class="refl-name">Group Synthesis</div><div class="refl-body">${SYNTHESIS.map(p=>/^\d\.\s/.test(p)?`<h4 style="font:800 1.05em var(--ui-font);color:#0f2a5c;margin:1em 0 .5em">${esc(p)}</h4>`:`<p>${esc(p)}</p>`).join("")}</div>`;
+  else { const r = REFLECTIONS.find(x=>x.who===recSel); html = `<div class="refl-name">${esc(r.name)}</div><div class="refl-body">${r.paras.length ? r.paras.map(p=>`<p>${esc(p)}</p>`).join("") : "<p><i>Reflection coming soon.</i></p>"}</div>`; }
+  $("pScroll").innerHTML = html;
+}
+document.querySelectorAll("[data-refl]").forEach(b=>b.onclick=openReflections);
+refreshReflectionsLock();
+document.querySelectorAll("[data-close]").forEach(b=>b.onclick=closePanels);
+document.addEventListener("keydown", e => {
+  if(document.querySelector(".screen.on") || document.querySelector(".panel[style*='block']")) { if(e.key==="Escape") closePanels(); return; }
+  if(e.key===" "||e.key==="Enter"){ e.preventDefault(); if($("video").style.display==="block") return; advance(); }
+});
+</script>
+</body>
+</html>
